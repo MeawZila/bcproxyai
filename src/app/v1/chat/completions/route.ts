@@ -249,7 +249,7 @@ async function forwardToProvider(
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status === 429 || status >= 500;
+  return status === 413 || status === 429 || status >= 500;
 }
 
 export async function POST(req: NextRequest) {
@@ -345,9 +345,9 @@ export async function POST(req: NextRequest) {
           const errText = await response.text();
           lastError = `${provider}/${actualModelId}: HTTP ${response.status} ${errText}`;
 
-          // Log cooldown for rate limit
-          if (response.status === 429) {
-            logCooldown(dbModelId, `HTTP 429: ${errText}`);
+          // Log cooldown for rate limit or request too large
+          if (response.status === 429 || response.status === 413) {
+            logCooldown(dbModelId, `HTTP ${response.status}: ${errText}`);
           }
           continue;
         }
