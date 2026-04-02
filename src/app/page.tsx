@@ -25,26 +25,33 @@ import { GuideModal } from "../components/GuideModal";
 
 // ─── Gateway Config Card ───────────────────────────────────────────────────────
 
-const GATEWAY_CONFIG_DOCKER = `{
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://host.docker.internal:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072
-}`;
+const ONBOARD_CMD_DOCKER = `docker exec <openclaw-container> \\
+  openclaw onboard \\
+  --non-interactive --accept-risk \\
+  --auth-choice custom-api-key \\
+  --custom-base-url http://host.docker.internal:3333/v1 \\
+  --custom-model-id auto \\
+  --custom-api-key dummy \\
+  --custom-compatibility openai \\
+  --skip-channels --skip-daemon \\
+  --skip-health --skip-search \\
+  --skip-skills --skip-ui`;
 
-const GATEWAY_CONFIG_LOCAL = `{
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://localhost:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072
-}`;
+const ONBOARD_CMD_LOCAL = `openclaw onboard \\
+  --non-interactive --accept-risk \\
+  --auth-choice custom-api-key \\
+  --custom-base-url http://localhost:3333/v1 \\
+  --custom-model-id auto \\
+  --custom-api-key dummy \\
+  --custom-compatibility openai \\
+  --skip-channels --skip-daemon \\
+  --skip-health --skip-search \\
+  --skip-skills --skip-ui`;
 
 function GatewayConfigCard() {
   const [copied, setCopied] = useState(false);
   const [configMode, setConfigMode] = useState<"docker" | "local">("docker");
-  const currentConfig = configMode === "docker" ? GATEWAY_CONFIG_DOCKER : GATEWAY_CONFIG_LOCAL;
+  const currentConfig = configMode === "docker" ? ONBOARD_CMD_DOCKER : ONBOARD_CMD_LOCAL;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(currentConfig).then(() => {
@@ -72,7 +79,7 @@ function GatewayConfigCard() {
           Gateway Config
         </span>
         <p style={{ fontSize: "0.875rem", color: "rgb(156,163,175)", marginTop: "0.25rem" }}>
-          วิธีเชื่อมต่อ BCProxyAI กับ OpenClaw — ใส่ใน openclaw.json:
+          เชื่อมต่อ OpenClaw กับ BCProxyAI — รันคำสั่งนี้ใน OpenClaw:
         </p>
       </div>
 
@@ -135,11 +142,14 @@ function GatewayConfigCard() {
         </button>
       </div>
 
-      {configMode === "docker" && (
-        <p style={{ fontSize: "0.7rem", color: "rgb(251,191,36)", marginTop: "0.5rem" }}>
-          * ใช้ <code style={{ fontFamily: "monospace" }}>host.docker.internal</code> แทน localhost เพราะ OpenClaw อยู่คนละ container
-        </p>
-      )}
+      <p style={{ fontSize: "0.7rem", color: "rgb(251,191,36)", marginTop: "0.5rem" }}>
+        {configMode === "docker"
+          ? "* ใช้ host.docker.internal แทน localhost เพราะ OpenClaw อยู่คนละ container"
+          : "* ใช้ localhost ได้เลย เพราะ OpenClaw รันบนเครื่องเดียวกัน"}
+      </p>
+      <p style={{ fontSize: "0.7rem", color: "rgb(156,163,175)", marginTop: "0.25rem" }}>
+        หลังรันคำสั่ง OpenClaw จะตั้งค่า provider ให้อัตโนมัติ (api: openai-completions, contextWindow: 131072)
+      </p>
 
       <div style={{ marginTop: "1rem" }}>
         <p style={{ fontSize: "0.75rem", color: "rgb(107,114,128)", marginBottom: "0.5rem", fontWeight: 600 }}>

@@ -268,25 +268,39 @@ openclaw onboard \
 
 #### ขั้นตอนที่ 2: แก้ไข openclaw.json
 
-หลัง onboard เสร็จ ต้องแก้ไขไฟล์ config ของ OpenClaw:
+หลัง onboard เสร็จ OpenClaw จะสร้าง config ให้อัตโนมัติ ตรวจสอบว่าถูกต้อง:
 
-1. หาไฟล์ `openclaw.json` (ปกติอยู่ใน home directory ของ OpenClaw)
-2. เปิดด้วย text editor
-3. แก้ไขให้เป็นแบบนี้:
+1. หาไฟล์ `openclaw.json` (ปกติอยู่ใน `~/.openclaw/openclaw.json`)
+2. ดูส่วน `models.providers` จะเห็น provider ที่เพิ่งสร้าง:
 
 ```json
 {
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://host.docker.internal:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072
+  "models": {
+    "providers": {
+      "custom-host-docker-internal-3333": {
+        "baseUrl": "http://host.docker.internal:3333/v1",
+        "apiKey": "dummy",
+        "api": "openai-completions",
+        "models": [{
+          "id": "auto",
+          "name": "BCProxyAI Auto",
+          "contextWindow": 131072,
+          "maxTokens": 8192
+        }]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": { "primary": "custom-host-docker-internal-3333/auto" }
+    }
+  }
 }
 ```
 
-> **สำคัญมาก:**
-> - `apiProvider` ต้องเป็น `"openai-completions"` (ไม่ใช่ `"openai-compatible"` -- ผิดนะ!)
-> - `contextWindow` ต้องเป็น `131072` (128K) -- ถ้าไม่ตั้ง OpenClaw จะส่ง context น้อยเกินไป
+> **ตรวจสอบให้แน่ใจว่า:**
+> - `api` เป็น `"openai-completions"` (onboard ตั้งให้อัตโนมัติ)
+> - `contextWindow` เป็น `131072` (128K) — ถ้าค่าน้อยกว่านี้ให้แก้ เพราะ OpenClaw ส่ง system prompt ใหญ่มาก
 > - BCProxyAI จะเลือกโมเดลที่มี context window พอกับ request ให้อัตโนมัติ
 
 #### ขั้นตอนที่ 3: แก้ปัญหา "pairing required"
@@ -321,28 +335,27 @@ openclaw devices approve abc123-def456-...
 
 > **ปัญหานี้เกิดเมื่อไหร่?** เมื่อ Gateway ถูก bind แบบ "loopback" (รับเฉพาะ 127.0.0.1) แต่ Docker Container เรียกมาจาก IP อื่น
 
-วิธีแก้ -- เพิ่มใน openclaw.json:
+วิธีแก้ -- แก้ส่วน `gateway` ใน openclaw.json:
 
 ```json
 {
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://host.docker.internal:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072,
   "gateway": {
     "bind": "lan",
-    "allowedOrigins": [
-      "http://host.docker.internal:3333",
-      "http://localhost:3333"
-    ]
+    "controlUi": {
+      "allowedOrigins": [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:18790",
+        "http://127.0.0.1:18790"
+      ]
+    }
   }
 }
 ```
 
 > **อธิบาย:**
 > - `"bind": "lan"` = เปิดให้เครื่องอื่นใน network เข้าถึงได้ (ไม่ใช่แค่ตัวเอง)
-> - `allowedOrigins` = รายชื่อ URL ที่อนุญาตให้เชื่อมต่อ
+> - `allowedOrigins` = รายชื่อ URL ที่อนุญาตให้เปิด Dashboard (ใส่ port ที่ map จาก Docker ด้วย)
 
 ### วิธีที่ 2: OpenClaw แบบ CLI Native (ไม่ใช้ Docker)
 
@@ -367,58 +380,16 @@ openclaw onboard \
   --skip-ui
 ```
 
-#### ขั้นตอนที่ 2: แก้ไข openclaw.json
+> เท่านี้เลย! onboard จะตั้งค่า provider ให้อัตโนมัติ (api: openai-completions, contextWindow ฯลฯ)  
+> ไม่ต้องแก้ openclaw.json เพิ่ม ไม่ต้อง approve device
 
-```json
-{
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://localhost:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072
-}
-```
-
-> เท่านี้เลย! ไม่ต้องตั้ง gateway หรือ approve device
-
-### ตัวอย่าง openclaw.json เต็มๆ (Docker -- ใช้ได้จริง)
-
-```json
-{
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://host.docker.internal:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072,
-  "gateway": {
-    "bind": "lan",
-    "allowedOrigins": [
-      "http://host.docker.internal:3333",
-      "http://localhost:3333"
-    ]
-  }
-}
-```
-
-### ตัวอย่าง openclaw.json เต็มๆ (CLI Native -- ใช้ได้จริง)
-
-```json
-{
-  "apiProvider": "openai-completions",
-  "openAiBaseUrl": "http://localhost:3333/v1",
-  "openAiModelId": "auto",
-  "openAiApiKey": "dummy",
-  "contextWindow": 131072
-}
-```
-
-### การแก้ปัญหา Token Mismatch
+### การแก้ปัญหา Request Too Large (413)
 
 > **ปัญหานี้เกิดเมื่อไหร่?** เมื่อ OpenClaw ส่ง context ที่ใหญ่เกินกว่าโมเดลจะรับได้
 
-1. ตรวจสอบว่า `contextWindow` ใน openclaw.json ตั้งเป็น `131072`
-2. BCProxyAI มีระบบ **smart context-aware selection** -- ประมาณจำนวน token ของ request แล้วเลือกเฉพาะโมเดลที่มี context window พอ
-3. ถ้าเจอ error 413 (payload too large) -- BCProxyAI จะ cooldown โมเดลนั้น 15 นาที แล้ว fallback ไปโมเดลอื่นอัตโนมัติ
+1. BCProxyAI มีระบบ **smart context-aware selection** — ประมาณจำนวน token ของ request แล้วเลือกเฉพาะโมเดลที่มี context window พอ
+2. ถ้าเจอ error 413 (payload too large) — BCProxyAI จะ cooldown โมเดลนั้น 15 นาที แล้ว fallback ไปโมเดลอื่นอัตโนมัติ
+3. ถ้า onboard ตั้ง contextWindow ต่ำเกินไป ให้แก้ใน openclaw.json ส่วน `models.providers.*.models[0].contextWindow` เป็น `131072`
 
 ### Checklist เชื่อมต่อ OpenClaw (เช็คทีละข้อ)
 
@@ -426,9 +397,7 @@ openclaw onboard \
 - [ ] BCProxyAI Docker รันอยู่ (`docker compose up -d`)
 - [ ] เปิด http://localhost:3333 ได้ (เห็น Dashboard)
 - [ ] Worker สแกนเสร็จ มีโมเดลพร้อมใช้ (ดูจาก Dashboard)
-- [ ] `openclaw onboard` เสร็จเรียบร้อย
-- [ ] แก้ `openclaw.json` -- `apiProvider` เป็น `"openai-completions"`
-- [ ] แก้ `openclaw.json` -- `contextWindow` เป็น `131072`
+- [ ] `openclaw onboard` เสร็จเรียบร้อย (ไม่ต้องแก้ openclaw.json เพิ่ม ถ้าใช้คำสั่งข้างบน)
 - [ ] ถ้าใช้ Docker: base URL เป็น `host.docker.internal:3333`
 - [ ] ถ้าใช้ Docker: approve pairing แล้ว (`openclaw devices approve`)
 - [ ] ถ้าใช้ Docker: gateway bind เป็น `"lan"` + allowedOrigins ถูกต้อง
