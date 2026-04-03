@@ -345,7 +345,11 @@ async function forwardToProvider(
     headers["X-Title"] = "BCProxyAI Gateway";
   }
 
-  const requestBody = { ...body, model: actualModelId };
+  const requestBody: Record<string, unknown> = { ...body, model: actualModelId };
+  // Ollama: set large context window via options.num_ctx
+  if (provider === "ollama") {
+    requestBody.options = { ...(requestBody.options as Record<string, unknown> ?? {}), num_ctx: 65536 };
+  }
 
   const response = await fetch(url, {
     method: "POST",
@@ -549,11 +553,11 @@ export async function POST(req: NextRequest) {
           return buildProxiedResponse(response, provider, actualModelId, isStream, estInputTokens);
         }
 
-        // Non-200: cooldown only for rate limit / server errors, skip for others
+        // Non-200: cooldown for cloud providers only (Ollama = local, never cooldown)
         const errText = await response.text().catch(() => "");
         lastError = `${provider}/${actualModelId}: HTTP ${response.status}`;
         const st = response.status;
-        if (st === 429 || st === 413 || st >= 500 || st === 401 || st === 403) {
+        if (provider !== "ollama" && (st === 429 || st === 413 || st >= 500 || st === 401 || st === 403)) {
           logCooldown(dbModelId, `HTTP ${st}: ${errText}`, st);
         }
         // Always retry next model regardless

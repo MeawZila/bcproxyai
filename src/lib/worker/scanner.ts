@@ -259,9 +259,9 @@ async function fetchOllamaModels(): Promise<ModelRow[]> {
     for (const m of json.models ?? []) {
       const name: string = m.name ?? m.model ?? "";
       if (!name) continue;
-      // Ollama model size → estimate context length
+      // Ollama: all models support at least 128K context with num_ctx parameter
       const sizeGB = (m.size ?? 0) / (1024 * 1024 * 1024);
-      const ctx = sizeGB >= 20 ? 131072 : sizeGB >= 8 ? 65536 : 32768;
+      const ctx = 128000; // Ollama supports large context via num_ctx
       models.push({
         id: `ollama:${name}`,
         name: name,
