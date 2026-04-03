@@ -744,8 +744,9 @@ export default function Dashboard() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {gatewayLogs.map((log) => {
-                      const dt = new Date(log.createdAt);
-                      const timeStr = dt.toLocaleString("th-TH", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                      const raw = log.createdAt.includes("Z") || log.createdAt.includes("+") ? log.createdAt : log.createdAt + "Z";
+                      const dt = new Date(raw);
+                      const timeStr = dt.toLocaleString("th-TH", { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
                       const isOk = log.status >= 200 && log.status < 300;
                       return (
                         <tr key={log.id} className="hover:bg-white/3">
@@ -798,8 +799,9 @@ export default function Dashboard() {
                 <div className="px-4 py-8 text-center text-gray-600">ยังไม่มีบันทึก</div>
               ) : (
                 logs.map((log, i) => {
-                  const dt = new Date(log.createdAt);
-                  const timeStr = dt.toLocaleString("th-TH", { hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                  const rawLog = log.createdAt.includes("Z") || log.createdAt.includes("+") ? log.createdAt : log.createdAt + "Z";
+                  const dt = new Date(rawLog);
+                  const timeStr = dt.toLocaleString("th-TH", { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
                   return (
                     <div key={i} className="flex items-start gap-3 px-4 py-2.5 hover:bg-white/3">
                       <span className="text-gray-600 shrink-0 w-36">{timeStr}</span>
