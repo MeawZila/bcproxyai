@@ -20,7 +20,7 @@ const QUESTIONS = [
   "กรุงเทพมหานครอยู่ประเทศอะไร?",
 ];
 
-const MAX_MODELS_PER_RUN = 3;
+const MAX_MODELS_PER_RUN = 10;
 const FAIL_SCORE_THRESHOLD = 3; // < 3/10 = สอบตก, ไม่สอบซ้ำ
 const RETEST_DAYS = 7; // สอบซ้ำได้หลัง 7 วัน
 
