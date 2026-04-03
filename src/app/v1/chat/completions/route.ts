@@ -95,9 +95,7 @@ function estimateTokens(body: Record<string, unknown>): number {
 }
 
 function getAvailableModels(caps: RequestCapabilities, minContext = 0): ModelRow[] {
-  const cacheKey = `models:${caps.hasTools}:${caps.hasImages}:${caps.needsJsonSchema}:${minContext}`;
-  const cached = getCached<ModelRow[]>(cacheKey);
-  if (cached) return cached;
+  // No cache — SQLite query < 1ms, cache causes Ollama priority issues
 
   const db = getDb();
   const now = new Date().toISOString();
@@ -153,7 +151,6 @@ function getAvailableModels(caps: RequestCapabilities, minContext = 0): ModelRow
     )
     .all(now) as ModelRow[];
 
-  setCache(cacheKey, rows, 10000); // cache 10 seconds
   return rows;
 }
 
@@ -253,10 +250,6 @@ function parseModelField(model: string): {
 
 // Last resort: get ALL models including cooldown ones — better than 503
 function getAllModelsIncludingCooldown(caps: RequestCapabilities): ModelRow[] {
-  const cacheKey = `allmodels:${caps.hasTools}:${caps.hasImages}`;
-  const cached = getCached<ModelRow[]>(cacheKey);
-  if (cached) return cached;
-
   const db = getDb();
   const filters: string[] = ["m.context_length >= 32000"];
   if (caps.hasTools) filters.push("m.supports_tools = 1");
@@ -273,7 +266,6 @@ function getAllModelsIncludingCooldown(caps: RequestCapabilities): ModelRow[] {
     LIMIT 20
   `).all() as ModelRow[];
 
-  setCache(cacheKey, result, 10000); // cache 10 seconds
   return result;
 }
 
