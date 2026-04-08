@@ -757,8 +757,13 @@ function isRetryableStatus(status: number): boolean {
 const XML_TOOL_CALL_RE = /<tool_call>|<functioncall>|<function_calls>/i;
 const THINK_TAG_RE = /<think>[\s\S]*?<\/think>/g;
 
-function isResponseBad(content: string, hadTools: boolean): string | null {
-  if (!content && hadTools) return null;
+function isResponseBad(content: string, hadTools: boolean, hasToolCalls = false): string | null {
+  // Empty content is acceptable ONLY if the model produced real tool_calls.
+  // If hadTools=true but content is empty AND no tool_calls, the model returned
+  // nothing useful — n้องกุ้ง (OpenClaw) agents will stall on this, so we reject
+  // the response and retry the next candidate.
+  if (!content && hadTools && !hasToolCalls) return "empty response with no tool_calls";
+  if (!content && !hadTools) return "empty content";
   if (hadTools && XML_TOOL_CALL_RE.test(content)) return "tool_call XML leak";
   if (content.length > 0 && content.length < 3) return "response too short";
   return null;
@@ -1082,8 +1087,8 @@ export async function POST(req: NextRequest) {
           const json = await cloned.json() as { choices?: Array<{ message?: { content?: string; tool_calls?: unknown[] } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
           let content = json.choices?.[0]?.message?.content ?? "";
           const hasToolCalls = Array.isArray(json.choices?.[0]?.message?.tool_calls) && (json.choices[0].message!.tool_calls!.length > 0);
-          const badReason = isResponseBad(content, caps.hasTools);
-          if (badReason && !hasToolCalls) {
+          const badReason = isResponseBad(content, caps.hasTools, hasToolCalls);
+          if (badReason) {
             console.log(`[HEDGE-BAD] ${winner.provider}/${winner.model_id} — ${badReason}`);
             // Fall through to sequential retry
           } else {
@@ -1186,8 +1191,8 @@ export async function POST(req: NextRequest) {
               let content = json.choices?.[0]?.message?.content ?? "";
               const hasToolCalls = Array.isArray(json.choices?.[0]?.message?.tool_calls) && (json.choices[0].message!.tool_calls!.length > 0);
 
-              const badReason = isResponseBad(content, caps.hasTools);
-              if (badReason && !hasToolCalls) {
+              const badReason = isResponseBad(content, caps.hasTools, hasToolCalls);
+              if (badReason) {
                 console.log(`[BAD-RESPONSE] ${provider}/${actualModelId} — ${badReason}: "${content.slice(0, 100)}"`);
                 await logCooldown(dbModelId, badReason, 0, 5);
                 await recordRoutingResult(dbModelId, provider, promptCategory, false, latency);
