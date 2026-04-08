@@ -10,7 +10,6 @@ import { getReputationScore } from "@/lib/worker/complaint";
 import { detectPromptCategory, recordRoutingResult, getBestModelsForCategory, getBestModelsByBenchmarkCategory, emitEvent, getRealAvgLatency } from "@/lib/routing-learn";
 import { getRedis } from "@/lib/redis";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { upstreamAgent } from "@/lib/upstream-agent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -650,8 +649,6 @@ async function forwardToProvider(
     headers,
     body: JSON.stringify(requestBody),
     signal: AbortSignal.timeout(timeoutMs),
-    // @ts-expect-error undici dispatcher not in standard fetch types
-    dispatcher: upstreamAgent,
   });
 
   if (response.status === 429) {

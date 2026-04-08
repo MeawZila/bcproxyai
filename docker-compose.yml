@@ -10,6 +10,11 @@ services:
     environment:
       DATABASE_URL: postgres://bcproxy:bcproxy@postgres:5432/bcproxyai
       REDIS_URL: redis://redis:6379
+      # Ollama runs on the Docker host, not inside the bcproxyai container.
+      # host.docker.internal resolves to the host on Docker Desktop / Linux 20.10+.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

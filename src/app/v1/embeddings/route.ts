@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { getNextApiKey } from "@/lib/api-keys";
 import { PROVIDER_EMBEDDING_URLS } from "@/lib/providers";
 import { openAIError } from "@/lib/openai-compat";
-import { upstreamAgent } from "@/lib/upstream-agent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -62,8 +61,6 @@ export async function POST(req: NextRequest) {
             input: body.input,
             encoding_format: body.encoding_format ?? "float",
           }),
-          // @ts-expect-error undici dispatcher not in standard fetch types
-          dispatcher: upstreamAgent,
         });
 
         if (response.ok) {

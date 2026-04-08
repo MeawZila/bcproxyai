@@ -1,22 +1,54 @@
-import { Agent } from "undici";
+import { Agent, RetryAgent } from "undici";
 
 /**
- * Shared HTTP agent for all LLM provider upstream calls.
- * - 128 connections per origin so multiple in-flight calls to the same provider don't queue
- * - 30s keep-alive so batches inside the same minute reuse the TLS handshake
- * - 15s connect timeout — some cloud LLM endpoints take 8-12s to complete TLS
- *   handshake on cold start, especially when accessed through distant CDN POPs.
- *   Tighter (5s) caused spurious "fetch failed" errors during bulk worker
- *   health checks, knocking good models into cooldown.
+ * Shared HTTP dispatcher for LLM provider upstream calls.
  *
- * NOT registered globally via setGlobalDispatcher — previously doing so broke
- * local image-URL downloads and other non-LLM fetches that have different
- * latency profiles. Each upstream callsite imports this agent explicitly.
+ * Why the wrapper:
+ *   Node/undici has a well-known race condition where keep-alive sockets
+ *   are returned to the pool just as the remote side closes them, and the
+ *   very next fetch picks that dead socket and throws
+ *   `TypeError: fetch failed` with `cause.code === "UND_ERR_SOCKET"`
+ *   (or ECONNRESET / "other side closed"). It happened here specifically
+ *   on Groq/Mistral where batched requests hit the same pooled socket
+ *   microseconds after the server sent FIN.
+ *
+ *   RetryAgent transparently retries on those low-level codes with a
+ *   fresh socket, so the caller never sees the transient error.
+ *
+ * Tuning:
+ *   - keepAliveTimeout: 4s — shorter than most cloud LB idle timeouts (5-10s),
+ *     so undici discards its side before the server closes.
+ *   - connections: 128 per origin — enough concurrency for burst traffic.
+ *   - connect.timeout: 15s — some CDN POPs are slow on cold TLS.
+ *   - pipelining: 0 — chat APIs may stream; pipelining is unsafe here.
+ *
+ * Not registered globally: each upstream callsite imports `upstreamAgent`
+ * explicitly via `fetch(url, { dispatcher: upstreamAgent })`.
  */
-export const upstreamAgent = new Agent({
-  keepAliveTimeout: 30_000,
-  keepAliveMaxTimeout: 60_000,
+const baseAgent = new Agent({
+  keepAliveTimeout: 4_000,
+  keepAliveMaxTimeout: 10_000,
   connections: 128,
   connect: { timeout: 15_000 },
-  pipelining: 0, // safe default for chat APIs that may stream
+  pipelining: 0,
+});
+
+export const upstreamAgent = new RetryAgent(baseAgent, {
+  maxRetries: 2,
+  minTimeout: 100,
+  maxTimeout: 1_000,
+  timeoutFactor: 2,
+  retryAfter: true,
+  methods: ["GET", "POST"],
+  statusCodes: [], // don't retry on HTTP status — that's the app's job
+  errorCodes: [
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "ENETDOWN",
+    "ENETUNREACH",
+    "EHOSTDOWN",
+    "UND_ERR_SOCKET",
+    "UND_ERR_CLOSED",
+  ],
 });

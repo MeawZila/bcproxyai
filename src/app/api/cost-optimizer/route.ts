@@ -23,13 +23,15 @@ export async function GET() {
   try {
     const sql = getSqlClient();
 
+    // Postgres doesn't resolve column aliases inside ORDER BY expressions,
+    // so repeat the SUMs instead of referencing total_input + total_output.
     const providerUsage = await sql<{ provider: string; total_input: number; total_output: number; requests: number }[]>`
       SELECT provider,
         SUM(input_tokens) as total_input, SUM(output_tokens) as total_output, COUNT(*) as requests
       FROM token_usage
       WHERE created_at >= now() - interval '30 days'
       GROUP BY provider
-      ORDER BY total_input + total_output DESC
+      ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC
     `;
 
     const modelUsage = await sql<{
@@ -47,7 +49,7 @@ export async function GET() {
       ) b ON m.id = b.model_id
       WHERE tu.created_at >= now() - interval '30 days'
       GROUP BY tu.provider, tu.model_id, m.nickname, b.avg_score
-      ORDER BY total_input + total_output DESC
+      ORDER BY SUM(tu.input_tokens) + SUM(tu.output_tokens) DESC
       LIMIT 20
     `;
 
