@@ -37,7 +37,7 @@ export async function GET() {
       SELECT
         to_char(created_at, 'YYYY-MM-DD') as date,
         provider,
-        ROUND(AVG(latency_ms)) as avg_latency,
+        ROUND(AVG(latency_ms)::numeric) as avg_latency,
         COUNT(*) as requests
       FROM gateway_logs
       WHERE created_at >= now() - interval '14 days'

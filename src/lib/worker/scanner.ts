@@ -1,7 +1,6 @@
 import { getSqlClient } from "@/lib/db/schema";
 import { getNextApiKey } from "@/lib/api-keys";
 import { emitEvent } from "@/lib/routing-learn";
-import { upstreamAgent } from "@/lib/upstream-agent";
 
 interface ModelRow {
   id: string;

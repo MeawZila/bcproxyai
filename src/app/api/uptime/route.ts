@@ -16,10 +16,10 @@ export async function GET() {
         COUNT(*) as total_checks,
         SUM(CASE WHEN h.status = 'available' THEN 1 ELSE 0 END) as available_checks,
         ROUND(
-          CAST(SUM(CASE WHEN h.status = 'available' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) * 100,
+          (SUM(CASE WHEN h.status = 'available' THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100),
           1
         ) as uptime_pct,
-        ROUND(AVG(CASE WHEN h.status = 'available' THEN h.latency_ms ELSE NULL END)) as avg_latency_ms
+        ROUND(AVG(CASE WHEN h.status = 'available' THEN h.latency_ms ELSE NULL END)::numeric) as avg_latency_ms
       FROM health_logs h
       JOIN models m ON h.model_id = m.id
       WHERE h.checked_at >= now() - interval '24 hours'
@@ -32,7 +32,7 @@ export async function GET() {
         to_char(h.checked_at, 'YYYY-MM-DD') as date,
         m.provider,
         ROUND(
-          CAST(SUM(CASE WHEN h.status = 'available' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) * 100,
+          (SUM(CASE WHEN h.status = 'available' THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100),
           1
         ) as uptime_pct
       FROM health_logs h

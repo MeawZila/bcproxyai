@@ -13,10 +13,10 @@ export async function GET() {
         COUNT(*) as total,
         SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as success,
         ROUND(
-          SUM(CASE WHEN status >= 200 AND status < 300 THEN 1.0 ELSE 0.0 END) / COUNT(*) * 100,
+          (SUM(CASE WHEN status >= 200 AND status < 300 THEN 1.0 ELSE 0.0 END)::numeric / COUNT(*) * 100),
           1
         ) as "successRate",
-        ROUND(AVG(latency_ms)) as "avgLatencyMs"
+        ROUND(AVG(latency_ms)::numeric) as "avgLatencyMs"
       FROM gateway_logs
       WHERE created_at >= now() - interval '24 hours'
       GROUP BY provider
@@ -46,7 +46,7 @@ export async function GET() {
         COALESCE(resolved_model, request_model) as model,
         provider,
         COUNT(*) as count,
-        ROUND(AVG(latency_ms)) as "avgLatencyMs"
+        ROUND(AVG(latency_ms)::numeric) as "avgLatencyMs"
       FROM gateway_logs
       WHERE created_at >= now() - interval '24 hours'
       GROUP BY COALESCE(resolved_model, request_model), provider

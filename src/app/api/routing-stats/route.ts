@@ -14,8 +14,8 @@ export async function GET() {
       SELECT
         rs.prompt_category, rs.model_id, rs.provider, m.nickname,
         COUNT(*) as total, SUM(rs.success) as successes,
-        ROUND(CAST(SUM(rs.success) AS REAL) / COUNT(*) * 100, 1) as success_rate,
-        ROUND(AVG(rs.latency_ms)) as avg_latency_ms
+        ROUND((SUM(rs.success)::numeric / COUNT(*) * 100), 1) as success_rate,
+        ROUND(AVG(rs.latency_ms)::numeric) as avg_latency_ms
       FROM routing_stats rs
       JOIN models m ON rs.model_id = m.id
       WHERE rs.created_at >= now() - interval '7 days'

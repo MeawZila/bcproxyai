@@ -1,7 +1,6 @@
 import { getSqlClient } from "@/lib/db/schema";
 import { getNextApiKey } from "@/lib/api-keys";
 import { PROVIDER_URLS } from "@/lib/providers";
-import { upstreamAgent } from "@/lib/upstream-agent";
 
 const NON_CHAT_KEYWORDS = [
   "whisper",
@@ -62,13 +61,17 @@ export async function pingModel(
   const timeoutMs = model.provider === "ollama" ? 120000 : 15000;
   const start = Date.now();
   try {
+    // Worker pings are sparse (~100 total per hour). Skip the shared
+    // upstreamAgent here — its 30s keep-alive window makes dead-socket
+    // reuse likely when providers close idle connections, which surfaced
+    // as spurious "fetch failed" TypeErrors and knocked good models into
+    // cooldown. Node's default fetch creates a fresh connection, which
+    // is fine for this cold path.
     const res = await fetch(url, {
       method: "POST",
       headers,
       body,
       signal: AbortSignal.timeout(timeoutMs),
-      // @ts-expect-error undici dispatcher not in standard fetch types
-      dispatcher: upstreamAgent,
     });
     const latency = Date.now() - start;
 
