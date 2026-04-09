@@ -1191,6 +1191,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // P3: Skip Ollama for tool requests when cloud alternatives exist
+      if (provider === "ollama" && caps.hasTools) {
+        const hasCloudLeft = spreadCandidates.slice(i).some(c => c.provider !== "ollama" && !blockedProviders.has(c.provider));
+        if (hasCloudLeft) {
+          console.log(`[OLLAMA-SKIP-TOOLS] ${actualModelId} — tools requested, cloud alternatives exist`);
+          continue;
+        }
+      }
+
       // P2: Skip known-broken tool models
       const candidateKey = `${provider}:${actualModelId}`;
       if (caps.hasTools && KNOWN_BROKEN_TOOL_MODELS.has(candidateKey)) {
