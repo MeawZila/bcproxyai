@@ -166,7 +166,7 @@ export function CostOptimizerPanel() {
                 <div key={`${m.provider}-${m.model_id}`} className="flex items-center gap-2 text-xs">
                   <span className="text-gray-600 w-4 text-right shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-gray-200 truncate">{m.nickname ?? m.model_id}</div>
+                    <div className="text-gray-200 truncate">{m.model_id}</div>
                     <div className={`text-[10px] ${colors.text}`}>{m.provider}</div>
                   </div>
                   <div className="text-right shrink-0">

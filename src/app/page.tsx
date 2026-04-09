@@ -50,6 +50,7 @@ import { SchoolBellPanel } from "../components/SchoolBellPanel";
 import { ProviderLimitsPanel } from "../components/ProviderLimitsPanel";
 import { SemanticCachePanel } from "../components/SemanticCachePanel";
 import { WarmupPanel } from "../components/WarmupPanel";
+import { TeachersPanel } from "../components/TeachersPanel";
 
 // ─── Gateway Config Card ───────────────────────────────────────────────────────
 
@@ -421,6 +422,7 @@ export default function Dashboard() {
             {[
               { id: "infra",         icon: "\u{1F3D7}", label: "โครงสร้าง" },
               { id: "status",        icon: "\u{1F3EB}", label: "ครูใหญ่" },
+              { id: "teachers",      icon: "\u{1F3EB}", label: "คณะครู" },
               { id: "limits",        icon: "\u{1F4CA}", label: "โควต้า" },
               { id: "cache",         icon: "\u{1F9E0}", label: "แคช" },
               { id: "warmup",        icon: "\u{1F525}", label: "อุ่นเครื่อง" },
@@ -456,6 +458,86 @@ export default function Dashboard() {
 
         {/* ── Live Mascot Theater (data-driven from gateway logs) ───────── */}
         <MascotScene />
+
+        {/* ── Gateway Logs (moved to top — right after Mascot, before Infra) ── */}
+        <section id="gateway-logs" className="animate-fade-in-up stagger-0">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </span>
+            <span className="font-bold text-white text-2xl">สมุดจดงาน</span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              LIVE
+            </span>
+            <span className="text-xs text-gray-500">{gatewayLogs.length} หน้า</span>
+          </div>
+
+          <div className="glass rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto max-h-[900px] overflow-y-auto">
+              {gatewayLogs.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-600">ยังไม่มีเด็กมาส่งการบ้าน</div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-gray-900/90 backdrop-blur">
+                    <tr className="border-b border-white/10 text-gray-500">
+                      <th className="px-3 py-2 text-left">เวลา</th>
+                      <th className="px-3 py-2 text-left">สถานะ</th>
+                      <th className="px-3 py-2 text-left">Request Model</th>
+                      <th className="px-3 py-2 text-left">Resolved</th>
+                      <th className="px-3 py-2 text-left">Provider</th>
+                      <th className="px-3 py-2 text-right">Latency</th>
+                      <th className="px-3 py-2 text-left">ข้อความ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {gatewayLogs.map((log) => {
+                      const raw = log.createdAt.includes("Z") || log.createdAt.includes("+") ? log.createdAt : log.createdAt + "Z";
+                      const dt = new Date(raw);
+                      const timeStr = dt.toLocaleString("th-TH", { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                      const isOk = log.status >= 200 && log.status < 300;
+                      return (
+                        <tr key={log.id} className="hover:bg-white/3">
+                          <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{timeStr}</td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold ${
+                              isOk ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                            }`}>
+                              {isOk ? "✓" : "✗"} {log.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-indigo-300 font-mono">{log.requestModel}</td>
+                          <td className="px-3 py-2 text-gray-300 font-mono truncate max-w-[150px]">{log.resolvedModel ?? "—"}</td>
+                          <td className="px-3 py-2">
+                            {log.provider && <ProviderBadge provider={log.provider} />}
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-400">{fmtMs(log.latencyMs)}</td>
+                          <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">
+                            <button
+                              className="text-left hover:text-gray-300 transition-colors cursor-pointer truncate max-w-full"
+                              onClick={() => setLogDetail(log)}
+                            >
+                              {log.error ? (
+                                <span className="text-red-400">{log.error.slice(0, 80)}</span>
+                              ) : (
+                                <span>{parseUserMsg(log.userMessage)?.slice(0, 60) ?? "—"}</span>
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* ── Infrastructure Monitoring ────────────────────────────────── */}
         <section id="infra" className="animate-fade-in-up stagger-0">
@@ -626,6 +708,11 @@ export default function Dashboard() {
 
           {/* Stats Cards */}
           <StatsCards stats={stats} loading={loading} />
+        </section>
+
+        {/* ── Teacher Hierarchy ───────────────────────────────────────── */}
+        <section id="teachers" className="animate-fade-in-up stagger-1">
+          <TeachersPanel />
         </section>
 
         {/* ── Provider Limits (TPM/TPD) ──────────────────────────────── */}
@@ -1046,85 +1133,6 @@ export default function Dashboard() {
           <ComplaintPanel />
         </section>
 
-        {/* ── Section 6: Gateway Logs ──────────────────────────────────── */}
-        <section id="gateway-logs" className="animate-fade-in-up stagger-5">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-            </span>
-            <span className="font-bold text-white text-2xl">สมุดจดงาน</span>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              </span>
-              LIVE
-            </span>
-            <span className="text-xs text-gray-500">{gatewayLogs.length} หน้า</span>
-          </div>
-
-          <div className="glass rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-              {gatewayLogs.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-600">ยังไม่มีเด็กมาส่งการบ้าน</div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-gray-900/90 backdrop-blur">
-                    <tr className="border-b border-white/10 text-gray-500">
-                      <th className="px-3 py-2 text-left">เวลา</th>
-                      <th className="px-3 py-2 text-left">สถานะ</th>
-                      <th className="px-3 py-2 text-left">Request Model</th>
-                      <th className="px-3 py-2 text-left">Resolved</th>
-                      <th className="px-3 py-2 text-left">Provider</th>
-                      <th className="px-3 py-2 text-right">Latency</th>
-                      <th className="px-3 py-2 text-left">ข้อความ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {gatewayLogs.map((log) => {
-                      const raw = log.createdAt.includes("Z") || log.createdAt.includes("+") ? log.createdAt : log.createdAt + "Z";
-                      const dt = new Date(raw);
-                      const timeStr = dt.toLocaleString("th-TH", { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-                      const isOk = log.status >= 200 && log.status < 300;
-                      return (
-                        <tr key={log.id} className="hover:bg-white/3">
-                          <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{timeStr}</td>
-                          <td className="px-3 py-2">
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold ${
-                              isOk ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
-                            }`}>
-                              {isOk ? "✓" : "✗"} {log.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-indigo-300 font-mono">{log.requestModel}</td>
-                          <td className="px-3 py-2 text-gray-300 font-mono truncate max-w-[150px]">{log.resolvedModel ?? "—"}</td>
-                          <td className="px-3 py-2">
-                            {log.provider && <ProviderBadge provider={log.provider} />}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-400">{fmtMs(log.latencyMs)}</td>
-                          <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">
-                            <button
-                              className="text-left hover:text-gray-300 transition-colors cursor-pointer truncate max-w-full"
-                              onClick={() => setLogDetail(log)}
-                            >
-                              {log.error ? (
-                                <span className="text-red-400">{log.error.slice(0, 80)}</span>
-                              ) : (
-                                <span>{parseUserMsg(log.userMessage)?.slice(0, 60) ?? "—"}</span>
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </section>
 
         {/* ── Section 7: บันทึกการทำงาน ─────────────────────────────────── */}
         <section id="logs" className="animate-fade-in-up stagger-5">

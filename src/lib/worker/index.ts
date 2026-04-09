@@ -2,6 +2,7 @@ import { getSqlClient } from "@/lib/db/schema";
 import { scanModels } from "./scanner";
 import { checkHealth } from "./health";
 import { runExams } from "./exam";
+import { appointTeachers } from "@/lib/teacher";
 import { acquireLeader, renewLeader, releaseLeader } from "./leader";
 
 export { scanModels } from "./scanner";
@@ -129,6 +130,23 @@ export async function runWorkerCycle(): Promise<void> {
     examResult = await runExams();
   } catch (err) {
     await logWorker("worker", `Step 3 (exam) failed: ${err}`, "error");
+  }
+
+  // Step 4: Appoint teachers — principal, heads, proctors จาก performance จริง
+  try {
+    await logWorker("worker", "Step 4: Appointing teachers");
+    const appointed = await appointTeachers();
+    if (appointed.principal) {
+      await logWorker(
+        "worker",
+        `👑 Teacher hierarchy: principal=${appointed.principal} | heads=${appointed.heads} | proctors=${appointed.proctors}`,
+        "success"
+      );
+    } else {
+      await logWorker("worker", "ยังไม่มี model พอที่จะแต่งตั้งเป็นครู", "warn");
+    }
+  } catch (err) {
+    await logWorker("worker", `Step 4 (teachers) failed: ${err}`, "error");
   }
 
   await setState("status", "idle");

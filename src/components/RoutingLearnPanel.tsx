@@ -144,7 +144,7 @@ export function RoutingLearnPanel() {
                     <div key={m.model_id} className="flex items-center gap-2">
                       <span className="text-xs text-gray-600 w-5 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs text-gray-200 truncate">{m.nickname ?? m.model_id.split(":")[0]}</div>
+                        <div className="text-xs text-gray-200 truncate">{m.model_id.split(":")[0]}</div>
                         <div className={`text-[10px] ${colors.text}`}>{m.provider}</div>
                       </div>
                       <div className="text-right shrink-0">

@@ -871,40 +871,10 @@ async function fetchHuggingFaceModels(): Promise<ModelRow[]> {
   }
 }
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
-
-export async function generateNickname(modelName: string, provider: string, existingNames: string[], scoreInfo = ""): Promise<string | null> {
-  if (!DEEPSEEK_API_KEY) return null;
-  try {
-    const avoid = existingNames.length > 0 ? `\nห้ามใช้ชื่อเหล่านี้: ${existingNames.slice(-30).join(", ")}` : "";
-    const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [{
-          role: "user",
-          content: `ตั้งชื่อเล่นภาษาไทยตลกๆ น่ารัก ให้ AI model ชื่อ "${modelName}" จาก ${provider}${scoreInfo} ตอบแค่ชื่อเดียว สั้นๆ 2-4 คำ ห้ามใส่เครื่องหมายคำพูด ห้ามอธิบาย${avoid}`,
-        }],
-        max_tokens: 30,
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const name = (json.choices?.[0]?.message?.content ?? "")
-      .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
-      .replace(/["'`]/g, "")
-      .trim()
-      .split("\n")[0]
-      .slice(0, 30);
-    return name || null;
-  } catch {
-    return null;
-  }
+// Nickname generation removed — UI shows provider + model_id directly.
+// Kept as no-op export for backward compat with other modules that still import it.
+export async function generateNickname(): Promise<string | null> {
+  return null;
 }
 
 export async function scanModels(): Promise<{ found: number; new: number; disappeared: number }> {
@@ -1024,30 +994,7 @@ export async function scanModels(): Promise<{ found: number; new: number; disapp
     }
   }
 
-  // ให้ DeepSeek ตั้งชื่อเล่นให้โมเดลที่ยังไม่มี nickname (max 10 ต่อรอบ ประหยัด token)
-  if (DEEPSEEK_API_KEY) {
-    const unnamed = await sql<{ id: string; name: string; provider: string }[]>`
-      SELECT id, name, provider FROM models WHERE nickname IS NULL AND context_length >= 32000 LIMIT 10
-    `;
-
-    if (unnamed.length > 0) {
-      const existingNicknameRows = await sql<{ nickname: string }[]>`
-        SELECT nickname FROM models WHERE nickname IS NOT NULL
-      `;
-      const existingNicknames = existingNicknameRows.map(r => r.nickname);
-
-      for (const m of unnamed) {
-        const nickname = await generateNickname(m.name, m.provider, existingNicknames);
-        if (nickname && !existingNicknames.includes(nickname)) {
-          try {
-            await sql`UPDATE models SET nickname = ${nickname} WHERE id = ${m.id}`;
-            existingNicknames.push(nickname);
-            await logWorker("scan", `🎭 ตั้งชื่อ: ${m.name} → "${nickname}"`, "success");
-          } catch { /* silent */ }
-        }
-      }
-    }
-  }
+  // Nickname generation removed — model shown as `provider/model_id` everywhere.
 
   // ตรวจจับ model ที่หายไป
   let disappearedCount = 0;

@@ -76,7 +76,7 @@ function ReportCardModal({
       <div className="bg-gray-800 rounded-xl max-w-lg w-full p-6 border border-gray-700" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-xl font-bold text-amber-400">
-            สมุดพก - {complaint.nickname ?? complaint.model_id}
+            สมุดพก - {complaint.model_id}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
         </div>
@@ -170,7 +170,7 @@ function HallOfFameShame({ topComplained }: { topComplained: TopComplained[] }) 
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-amber-300 text-sm font-medium truncate">
-                    {m.nickname ?? m.model_id}
+                    {m.model_id}
                   </div>
                   <div className={`text-xs ${colors.text}`}>{m.provider}{dunce}</div>
                 </div>
@@ -200,7 +200,7 @@ function HallOfFameShame({ topComplained }: { topComplained: TopComplained[] }) 
                   {m.complaint_count >= 5 ? "🚫" : m.complaint_count >= 3 ? "⚠️" : "📝"}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-white text-sm truncate">{m.nickname ?? m.model_id}</div>
+                  <div className="text-white text-sm truncate">{m.model_id}</div>
                   <div className={`text-xs ${colors.text}`}>{m.provider}</div>
                 </div>
                 <div className="text-right">
@@ -300,7 +300,7 @@ export function ComplaintPanel() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-amber-300 text-sm font-medium truncate">
-                        {c.nickname ?? c.model_id}
+                        {c.model_id}
                       </span>
                       <span className={`text-xs ${colors.text}`}>{c.provider}</span>
                       {c.source === "auto" && (

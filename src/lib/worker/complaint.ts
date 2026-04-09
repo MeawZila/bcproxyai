@@ -138,22 +138,9 @@ export async function processComplaint(
       VALUES (${dbModelId}, 'complained', ${'Re-exam failed: ' + score + '/10'}, ${cooldownUntil}, now())
     `;
 
-    // Update nickname to reflect bad behavior
-    const existingNicknameRows = await sql<{ nickname: string }[]>`
-      SELECT nickname FROM models WHERE nickname IS NOT NULL
-    `;
-    const existingNames = existingNicknameRows.map(r => r.nickname);
-    const newNickname = await generateNickname(
-      modelId,
-      provider,
-      existingNames,
-      `ถูกร้องเรียนว่า "${getCategoryLabel(category)}" และสอบตก (${score}/10) — ตั้งชื่อที่สะท้อนว่าถูกตำหนิ`
-    );
-    if (newNickname) {
-      await sql`UPDATE models SET nickname = ${newNickname} WHERE id = ${dbModelId}`;
-      await logWorker("complaint", `${modelId} renamed to "${newNickname}" after failing re-exam`, "warn");
-    }
-
+    // Nickname update removed — models shown as provider/model_id
+    void provider;
+    void category;
     await logWorker("complaint", `${modelId} failed re-exam (${score}/10) — cooldown extended 2hr`, "warn");
   }
 

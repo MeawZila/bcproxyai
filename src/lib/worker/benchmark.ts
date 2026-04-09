@@ -434,34 +434,7 @@ export async function runBenchmarks(): Promise<{
           passed ? "success" : "warn"
         );
 
-        // Generate nickname based on score + categories
-        if (DEEPSEEK_API_KEY) {
-          try {
-            const { generateNickname } = await import("./scanner");
-            const existingRows = await sql<{ nickname: string }[]>`
-              SELECT nickname FROM models WHERE nickname IS NOT NULL AND id != ${model.id}
-            `;
-            const existingNicknames = existingRows.map(r => r.nickname);
-
-            const catEntries = Object.entries(categoryScores).map(([cat, s]) => ({ cat, avg: s.total / s.count }));
-            catEntries.sort((a, b) => b.avg - a.avg);
-            const bestCat = catEntries[0]?.cat ?? "";
-            const worstCat = catEntries[catEntries.length - 1]?.cat ?? "";
-
-            let behavior = "";
-            if (pct >= 90) behavior = ` คะแนนสูงมาก ${pct}% เด่นมาก เก่งทุกวิชา โดยเฉพาะ ${bestCat}`;
-            else if (pct >= 70) behavior = ` คะแนนดี ${pct}% ถนัด ${bestCat} แต่ต้องปรับปรุง ${worstCat}`;
-            else if (pct >= 50) behavior = ` คะแนนพอผ่าน ${pct}% เก่ง ${bestCat} แต่อ่อน ${worstCat}`;
-            else if (pct >= 30) behavior = ` คะแนนต่ำ ${pct}% อ่อนหลายวิชา โดยเฉพาะ ${worstCat}`;
-            else behavior = ` สอบตก ${pct}% ต้องเรียนซ้ำทุกวิชา`;
-
-            const nickname = await generateNickname(model.model_id, model.provider, existingNicknames, behavior);
-            if (nickname) {
-              await sql`UPDATE models SET nickname = ${nickname} WHERE id = ${model.id}`;
-              await logWorker("benchmark", `🎭 ตั้งชื่อ: ${model.model_id} → "${nickname}" (${pct}%)`, "success");
-            }
-          } catch { /* silent */ }
-        }
+        // Nickname generation removed — models shown as provider/model_id
       }
     }
   }

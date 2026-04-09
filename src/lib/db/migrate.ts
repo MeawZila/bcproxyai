@@ -326,6 +326,40 @@ export async function runMigrations(): Promise<void> {
       )
     `;
 
+    // ─── Teacher Hierarchy ───────────────────────────────────────────────────
+    // role: 'principal' (1), 'head' (per-category), 'proctor' (5-10)
+    // ครูถูกเลือกอัตโนมัติจาก exam/live score ทุกรอบ worker
+    await sql`
+      CREATE TABLE IF NOT EXISTS teachers (
+        model_id TEXT PRIMARY KEY REFERENCES models(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('principal', 'head', 'proctor')),
+        category TEXT,
+        score REAL NOT NULL DEFAULT 0,
+        appointed_at TIMESTAMPTZ DEFAULT now(),
+        reappointed_count INT DEFAULT 0
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_teachers_role ON teachers(role)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_teachers_category ON teachers(category) WHERE category IS NOT NULL`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS grading_history (
+        id BIGSERIAL PRIMARY KEY,
+        attempt_id BIGINT,
+        grader_model_id TEXT NOT NULL,
+        grader_role TEXT NOT NULL,
+        question_id TEXT NOT NULL,
+        category TEXT,
+        original_score REAL,
+        final_score REAL,
+        reasoning TEXT,
+        method TEXT,
+        graded_at TIMESTAMPTZ DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_grading_attempt ON grading_history(attempt_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_grading_grader ON grading_history(grader_model_id, graded_at DESC)`;
+
     console.log("[migrate] All tables created/verified");
   } catch (err) {
     console.error("[migrate] Migration failed:", err);

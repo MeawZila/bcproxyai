@@ -150,7 +150,7 @@ export function UptimePanel() {
                   <span className="text-base">{statusIcon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-200">{inc.nickname ?? inc.model_id}</span>
+                      <span className="text-gray-200">{inc.model_id}</span>
                       <span className={`${colors.text} text-[10px]`}>{inc.provider}</span>
                     </div>
                     {inc.error && (
