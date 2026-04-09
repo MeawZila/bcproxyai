@@ -26,6 +26,7 @@ const PROVIDER_TPM_FALLBACK: Record<string, number> = {
   kilo: 50_000,
   ollama: Infinity,    // local, no limit
   google: 30_000,
+  nvidia: 100_000,  // NVIDIA NIM — generous per-key
 };
 
 const WINDOW_MS = 60_000;

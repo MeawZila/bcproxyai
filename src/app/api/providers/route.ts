@@ -19,6 +19,7 @@ const ENV_MAP: Record<string, string> = {
   cohere: "COHERE_API_KEY",
   cloudflare: "CLOUDFLARE_API_TOKEN",
   huggingface: "HF_TOKEN",
+  nvidia: "NVIDIA_API_KEY",
 };
 
 const NO_KEY_REQUIRED = new Set(["ollama"]);

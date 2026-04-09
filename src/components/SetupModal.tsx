@@ -28,6 +28,7 @@ const PROVIDERS: ProviderInfo[] = [
   { provider: "cohere", label: "Cohere", description: "Command R+ — เก่ง RAG และ multilingual", signupUrl: "https://dashboard.cohere.com/api-keys", envVar: "COHERE_API_KEY", icon: "\u{1F4E1}" },
   { provider: "cloudflare", label: "Cloudflare AI", description: "Workers AI — รัน model บน edge ฟรี", signupUrl: "https://dash.cloudflare.com/profile/api-tokens", envVar: "CLOUDFLARE_API_TOKEN", icon: "\u2601\uFE0F" },
   { provider: "huggingface", label: "HuggingFace", description: "Inference API — model หลากหลายที่สุด", signupUrl: "https://huggingface.co/settings/tokens", envVar: "HF_TOKEN", icon: "\u{1F917}" },
+  { provider: "nvidia", label: "NVIDIA NIM", description: "NVIDIA Inference Microservices — Llama, Nemotron, DeepSeek ฟรี (1000 req/month)", signupUrl: "https://build.nvidia.com/", envVar: "NVIDIA_API_KEY", icon: "\u{1F7E2}" },
 ];
 
 // ─── Types ───────────────────────────────────────────────────────────────────

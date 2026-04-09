@@ -541,6 +541,44 @@ async function fetchCloudflareModels(): Promise<ModelRow[]> {
   }
 }
 
+async function fetchNvidiaModels(): Promise<ModelRow[]> {
+  const apiKey = getNextApiKey("nvidia");
+  if (!apiKey) return [];
+  try {
+    const res = await fetch("https://integrate.api.nvidia.com/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const models: ModelRow[] = [];
+    for (const m of json.data ?? []) {
+      const mid: string = m.id ?? "";
+      if (!mid) continue;
+      if (NON_CHAT_KEYWORDS.some((kw) => mid.toLowerCase().includes(kw))) continue;
+      // NVIDIA catalog มีทั้ง chat, embed, rerank, vision — กรองเอาเฉพาะ chat
+      if (/embed|rerank|ocr|stt|tts|whisper|guard|safety/i.test(mid)) continue;
+      // NVIDIA API ไม่ส่ง context_length กลับมา → ใช้ default ที่สมเหตุสมผล
+      const ctx = m.context_length ?? m.context_window ?? 32_768;
+      models.push({
+        id: `nvidia:${mid}`,
+        name: mid.split("/").pop() ?? mid,
+        provider: "nvidia",
+        model_id: mid,
+        context_length: ctx,
+        tier: calcTier(ctx),
+        description: undefined,
+        supports_vision: detectVision(mid, mid),
+        supports_tools: detectTools(mid, mid),
+      });
+    }
+    return models;
+  } catch (err) {
+    await logWorker("scan", `NVIDIA fetch error: ${err}`, "error");
+    return [];
+  }
+}
+
 async function fetchHuggingFaceModels(): Promise<ModelRow[]> {
   const token = getNextApiKey("huggingface");
   if (!token) return [];
@@ -641,7 +679,7 @@ export async function scanModels(): Promise<{ found: number; new: number; disapp
     return fn();
   };
 
-  const [orModels, kiloModels, googleModels, groqModels, cerebrasModels, sambaNovaModels, mistralModels, ollamaModels, githubModels, fireworksModels, cohereModels, cloudflareModels, hfModels] = await Promise.all([
+  const [orModels, kiloModels, googleModels, groqModels, cerebrasModels, sambaNovaModels, mistralModels, ollamaModels, githubModels, fireworksModels, cohereModels, cloudflareModels, hfModels, nvidiaModels] = await Promise.all([
     guard("openrouter", fetchOpenRouterModels),
     guard("kilo", fetchKiloModels),
     guard("google", fetchGoogleModels),
@@ -655,9 +693,10 @@ export async function scanModels(): Promise<{ found: number; new: number; disapp
     guard("cohere", fetchCohereModels),
     guard("cloudflare", fetchCloudflareModels),
     guard("huggingface", fetchHuggingFaceModels),
+    guard("nvidia", fetchNvidiaModels),
   ]);
 
-  const allModels = [...orModels, ...kiloModels, ...googleModels, ...groqModels, ...cerebrasModels, ...sambaNovaModels, ...mistralModels, ...ollamaModels, ...githubModels, ...fireworksModels, ...cohereModels, ...cloudflareModels, ...hfModels];
+  const allModels = [...orModels, ...kiloModels, ...googleModels, ...groqModels, ...cerebrasModels, ...sambaNovaModels, ...mistralModels, ...ollamaModels, ...githubModels, ...fireworksModels, ...cohereModels, ...cloudflareModels, ...hfModels, ...nvidiaModels];
   const foundIds = new Set(allModels.map(m => m.id));
   let newCount = 0;
 
@@ -752,7 +791,7 @@ export async function scanModels(): Promise<{ found: number; new: number; disapp
     }
   } catch { /* silent */ }
 
-  const msg = `Scan: พบ ${allModels.length} (OR=${orModels.length}, Kilo=${kiloModels.length}, Google=${googleModels.length}, Groq=${groqModels.length}, Cerebras=${cerebrasModels.length}, SN=${sambaNovaModels.length}, Mistral=${mistralModels.length}, Ollama=${ollamaModels.length}, GitHub=${githubModels.length}, FW=${fireworksModels.length}, Cohere=${cohereModels.length}, CF=${cloudflareModels.length}, HF=${hfModels.length}) | ใหม่ ${newCount} | หายไป ${disappearedCount}`;
+  const msg = `Scan: พบ ${allModels.length} (OR=${orModels.length}, Kilo=${kiloModels.length}, Google=${googleModels.length}, Groq=${groqModels.length}, Cerebras=${cerebrasModels.length}, SN=${sambaNovaModels.length}, Mistral=${mistralModels.length}, Ollama=${ollamaModels.length}, GitHub=${githubModels.length}, FW=${fireworksModels.length}, Cohere=${cohereModels.length}, CF=${cloudflareModels.length}, HF=${hfModels.length}, NVIDIA=${nvidiaModels.length}) | ใหม่ ${newCount} | หายไป ${disappearedCount}`;
   await logWorker("scan", msg);
 
   return { found: allModels.length, new: newCount, disappeared: disappearedCount };
