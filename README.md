@@ -3,32 +3,61 @@
 **OpenAI-compatible LLM gateway ที่รวม model ฟรี จาก 26 providers ในจุดเดียว**
 ระบบฉลาดขึ้นเองจากการใช้งาน — ไม่ต้องตั้งค่า ยิ่งใช้ยิ่งรู้จัก
 
+> เหมาะกับ: Developer ที่ต้องการทดลอง AI, Startup ที่อยากลดค่า API, Production app ที่ต้องการ fallback/redundancy, Coding agent (OpenClaw, Aider, Cline)
+
 ---
 
-## 💰 ประหยัดได้เท่าไหร่ (TL;DR)
+## 📋 สารบัญ
 
-**Free budget: ~20 พันล้าน tokens/เดือน** (คำนวณจาก documented TPD/TPM limits × practical utilization)
+- [✨ Highlights](#-highlights)
+- [🚀 Quick Start (5 นาที)](#-quick-start-5-นาที)
+- [📦 Provider List 26 ตัว](#-provider-list--26-ตัว)
+- [🏗 Architecture](#-architecture)
+- [🚀 Installation Guide (ละเอียด)](#-ติดตั้ง-installation-guide)
+- [🎓 Exam System](#-ระบบสอบ-exam-system)
+- [🧠 Self-Tuning Learning](#-self-tuning-learning)
+- [🎯 Smart Routing Pipeline](#-smart-routing-pipeline)
+- [🔌 API Endpoints](#-api-endpoints)
+- [🗃 Database Schema](#-database-schema)
+- [🔗 Integration Examples](#-integration-examples)
+- [🛠 Troubleshooting](#-troubleshooting)
+- [❓ FAQ](#-faq)
+- [🔧 Development](#-development)
 
-**แจกแจง token:** 80% input (16B) + 20% output (4B) = **20B tokens/month**
+---
 
-### 💵 เทียบเงินที่ประหยัดได้
+## 🚀 Quick Start (5 นาที)
 
-| Model | Input $/1M | Output $/1M | **$/เดือน** | **฿/เดือน** | ฿/ปี |
-|---|---:|---:|---:|---:|---:|
-| 🏆 **Novita Llama 3.1 8B** (ถูกสุด) | $0.02 | $0.02 | **$400** | **฿14,000** | ฿168,000 |
-| Groq paid (Llama 8B) | $0.06 | $0.06 | $1,200 | ฿42,000 | ฿504,000 |
-| Gemini Flash-Lite | $0.10 | $0.40 | $3,200 | ฿112,000 | ฿1,344,000 |
-| DeepSeek V3.2 | $0.14 | $0.28 | $3,360 | ฿117,600 | ฿1,411,200 |
-| GPT-4o mini | $0.15 | $0.60 | $4,800 | ฿168,000 | ฿2,016,000 |
-| DeepSeek V3 | $0.27 | $1.10 | $8,720 | ฿305,200 | ฿3,662,400 |
-| Claude Haiku 4.5 | $1.00 | $5.00 | $36,000 | ฿1,260,000 | ฿15,120,000 |
-| **GPT-4o** | $2.50 | $10.00 | **$80,000** | **฿2,800,000** | ฿33,600,000 |
-| **Claude Sonnet 4.6** | $3.00 | $15.00 | **$108,000** | **฿3,780,000** | ฿45,360,000 |
-| **Claude Opus 4.6** | $5.00 | $25.00 | **$180,000** | **฿6,300,000** | ฿75,600,000 |
-| GPT-5 | $10.00 | $30.00 | $280,000 | ฿9,800,000 | ฿117,600,000 |
-| **Claude Opus 4** (legacy) | $15.00 | $75.00 | **$540,000** | **฿18,900,000** | ฿226,800,000 |
+ต้องการทดลองเร็วสุด ใช้แค่ 2 provider ก็พอ:
 
-**หมายเหตุ:** ราคาจาก [OpenAI Pricing](https://openai.com/api/pricing/) และ [Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing) (Apr 2026) · Exchange rate ฿35/USD
+```bash
+# 1. Clone + install
+git clone https://github.com/jaturapornchai/bcproxyai.git
+cd bcproxyai
+cp .env.example .env.local
+
+# 2. แก้ .env.local ใส่ 2 keys
+# GROQ_API_KEY=gsk_xxx          ← https://console.groq.com/keys (ฟรี)
+# NVIDIA_API_KEY=nvapi-xxx      ← https://build.nvidia.com/ (ฟรี)
+
+# 3. Build + run
+docker compose up -d --build
+
+# 4. รอ 10 วินาที แล้วเปิด dashboard
+sleep 10 && open http://localhost:3334/
+
+# 5. Trigger worker scan (1 ครั้ง)
+curl -X POST http://localhost:3334/api/worker
+```
+
+เท่านี้ก็พร้อมใช้งาน — model ที่ผ่านสอบจะพร้อมรับ request อัตโนมัติ
+
+**ทดสอบเรียกใช้:**
+```bash
+curl -X POST http://localhost:3334/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"bcproxy/auto","messages":[{"role":"user","content":"สวัสดี"}]}'
+```
 
 ---
 
@@ -280,6 +309,95 @@ http://localhost:3334/
 - **ModelGrid** — All models + exam scores
 - **ProviderStatus** — 26 provider cards
 - **SetupModal** — ตั้งค่า API key + toggle provider
+
+### Step 6: Verify Installation
+
+ตรวจสอบว่าทุกอย่างพร้อม:
+
+```bash
+# 1. Container ทั้งหมด healthy
+docker ps --format "{{.Names}}\t{{.Status}}" | grep bcproxyai
+
+# ต้องเห็น:
+#  bcproxyai-bcproxyai-1   Up (healthy)
+#  bcproxyai-caddy-1       Up
+#  bcproxyai-postgres-1    Up (healthy)
+#  bcproxyai-redis-1       Up (healthy)
+
+# 2. API health check
+curl -s http://localhost:3334/api/health | python -m json.tool
+
+# 3. ดู providers ที่ active
+curl -s http://localhost:3334/api/providers | python -c "
+import sys, json
+for p in json.load(sys.stdin):
+  icon = '✅' if p['status']=='active' else '⏸'
+  print(f\"{icon} {p['provider']:15} status={p['status']:10} models={p.get('modelCount',0)}\")
+"
+
+# 4. ดู models ที่ผ่านสอบแล้ว
+curl -s http://localhost:3334/api/status | python -c "
+import sys, json
+d = json.load(sys.stdin)
+print(f\"Total: {d['stats']['totalModels']}\")
+print(f\"Available: {d['stats']['availableModels']}\")
+print(f\"Passed exam: {d['stats']['benchmarkedModels']}\")
+"
+```
+
+### Step 7: First API Call
+
+```bash
+# ทดสอบ chat
+curl -X POST http://localhost:3334/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "bcproxy/auto",
+    "messages": [
+      {"role": "user", "content": "สวัสดี ตอบสั้นๆ ภาษาไทย"}
+    ]
+  }' | python -m json.tool
+```
+
+**ถ้าได้ response 200 + content ภาษาไทย → ติดตั้งสำเร็จ ✅**
+
+### Step 8: Production Tips
+
+#### เปิด External Caddy (port 3333, timeout 300s)
+
+สำหรับ production ที่ต้องการรับ request ยาว (coding agents, long context):
+
+```bash
+# แก้ Caddyfile (external)
+# dev.bcproxyai.com {
+#     reverse_proxy localhost:3334 {
+#         timeout 300s
+#     }
+# }
+
+# Reload
+powershell -File "C:/Users/jatur/restart-caddy.ps1"
+```
+
+#### Scale Horizontal
+
+```bash
+docker compose up -d --scale bcproxyai=3
+# → Caddy in-compose จะ load balance + Redis leader election ป้องกัน duplicate worker
+```
+
+#### Monitor
+
+```bash
+# Real-time gateway logs
+docker logs bcproxyai-bcproxyai-1 -f | grep -E "\[REQ:|\[RES:"
+
+# Worker status
+watch -n 5 "curl -s http://localhost:3334/api/status | python -m json.tool | grep -A5 worker"
+
+# Learning progress
+curl -s http://localhost:3334/api/learning | python -m json.tool
+```
 
 ---
 
@@ -615,163 +733,216 @@ Setup Modal → Toggle switch per provider
 
 ---
 
-## 💵 Cost Comparison (Deep Dive)
+## 🛠 Troubleshooting
 
-### Free Token Budget — คำนวณจาก documented TPD/TPM/RPM
+### 🔴 Container ไม่ start / Healthcheck fail
 
-**Conservative practical estimate** (20% utilization of theoretical max):
+```bash
+# ดู log
+docker logs bcproxyai-bcproxyai-1 --tail=50
 
-| Provider | Limit Source | Tokens/เดือน |
-|---|---|---:|
-| **Groq** | llama-8b 500K TPD + 6 other models | **~10B** |
-| **SambaNova** | 12 models × 20-30 RPM × 2.5K/req | **~5B** |
-| **Mistral** | 1 RPS cap + 1B tok/month per model | **~2B** |
-| **Chutes.ai** | Unlimited community GPU | **~1B** |
-| **LLM7.io** | 30 RPM × 2.5K × 24h | **~500M** |
-| **Pollinations** | Secret key unlimited | **~500M** |
-| **Together AI** | $25 signup + free models | **~500M** |
-| **glhf.chat** | Beta free (rate-limited) | **~200M** |
-| **Google Gemini** | 3 tiers × RPD caps | **~120M** |
-| **SiliconFlow** | 1000 RPD (w/$1 topup) | **~75M** |
-| **OpenRouter** | 1000 RPD (w/$10 credit) | **~75M** |
-| **Cerebras** | 1M tokens/day × 30 | **~30M** |
-| **GitHub Models** | 200 RPD × 2.5K | **~15M** |
-| **Reka AI** | $10/mo auto ÷ $0.75/1M | **~13M** |
-| **Ollama Cloud** | 16K tok/hr × 24h × 30 | **~11.5M** |
-| **Cloudflare AI** | 10K Neurons/day | **~3M** |
-| **Cohere** | 1000 req/month | **~2.5M** |
-| **HuggingFace** | $0.10/mo credits | **~2M** |
-| **NVIDIA NIM** | 1000 credits (÷ 30 amortize) | **~2.5M** |
-| **Hyperbolic** | $1 signup (÷ 30) | **~2.5M** |
-| **DashScope (Qwen)** | 1M tok × 90 days (÷ 3) | **~667K** |
-| **Z.AI (GLM)** | Signup credits (amortize) | **~1.7M** |
-| **Scaleway** | 1M tok lifetime (÷ 30) | **~33K** |
-| **Ollama local** | Unlimited (hardware only) | ∞ |
-| | | |
-| **รวม Practical** | | **~20 พันล้าน tokens/month** |
+# ตรวจ postgres + valkey พร้อมไหม
+docker ps --format "{{.Names}}\t{{.Status}}"
 
-### Token-based Cost (20B tokens = 16B input + 4B output)
-
-**ถ้าต้องจ่ายเงินแทน BCProxyAI:**
-
-| Tier | Model | Input | Output | Cost/month | ฿/month | ฿/year |
-|---|---|---:|---:|---:|---:|---:|
-| 🏆 Cheapest | **Novita Llama 3.1 8B** | $0.02 | $0.02 | **$400** | **฿14,000** | ฿168,000 |
-| Cheap | Groq paid (Llama 8B) | $0.06 | $0.06 | $1,200 | ฿42,000 | ฿504,000 |
-| Cheap | SiliconFlow (8B) | $0.06 | $0.06 | $1,200 | ฿42,000 | ฿504,000 |
-| Cheap | Qwen3 4B (Novita) | $0.03 | $0.03 | $600 | ฿21,000 | ฿252,000 |
-| Budget | Gemini 2.5 Flash-Lite | $0.10 | $0.40 | $3,200 | ฿112,000 | ฿1,344,000 |
-| Budget | DeepSeek V3.2 | $0.14 | $0.28 | $3,360 | ฿117,600 | ฿1,411,200 |
-| Budget | GPT-4o mini | $0.15 | $0.60 | $4,800 | ฿168,000 | ฿2,016,000 |
-| Budget | Gemini 2.5 Flash | $0.15 | $0.60 | $4,800 | ฿168,000 | ฿2,016,000 |
-| Mid | DeepSeek V3 | $0.27 | $1.10 | $8,720 | ฿305,200 | ฿3,662,400 |
-| Mid | o4 mini | $0.55 | $2.20 | $17,600 | ฿616,000 | ฿7,392,000 |
-| Mid | Claude Haiku 4.5 | $1.00 | $5.00 | $36,000 | ฿1,260,000 | ฿15,120,000 |
-| Mid | Gemini 1.5 Pro | $1.25 | $5.00 | $40,000 | ฿1,400,000 | ฿16,800,000 |
-| 💎 Premium | **GPT-4o** | $2.50 | $10.00 | **$80,000** | **฿2,800,000** | ฿33,600,000 |
-| Premium | **Claude Sonnet 4.6** | $3.00 | $15.00 | **$108,000** | **฿3,780,000** | ฿45,360,000 |
-| Premium | **Claude Opus 4.6** | $5.00 | $25.00 | **$180,000** | **฿6,300,000** | ฿75,600,000 |
-| Premium | GPT-5 | $10.00 | $30.00 | $280,000 | ฿9,800,000 | ฿117,600,000 |
-| 👑 Flagship | **Claude Opus 4** (legacy) | $15.00 | $75.00 | **$540,000** | **฿18,900,000** | ฿226,800,000 |
-
-### การคำนวณ (16B input + 4B output)
-
-```
-Novita Llama 8B:
-  Input:  16,000M × $0.02/1M = $320
-  Output:  4,000M × $0.02/1M = $80
-  Total:                       $400/month
-
-GPT-4o:
-  Input:  16,000M × $2.50/1M = $40,000
-  Output:  4,000M × $10.0/1M = $40,000
-  Total:                       $80,000/month
-
-Claude Sonnet 4.6:
-  Input:  16,000M × $3.00/1M = $48,000
-  Output:  4,000M × $15.0/1M = $60,000
-  Total:                       $108,000/month
-
-Claude Opus 4 (legacy):
-  Input:  16,000M × $15.0/1M = $240,000
-  Output:  4,000M × $75.0/1M = $300,000
-  Total:                       $540,000/month
+# Restart ทั้งหมด
+docker compose down && docker compose up -d --build
 ```
 
-### BCProxyAI Weighted Blend Quality
+**สาเหตุที่พบบ่อย:**
+- `.env.local` ไม่มี หรือ format ผิด → `cp .env.example .env.local` แล้วเพิ่ม key ใหม่
+- Port 3334/5434/6382 ถูกใช้อยู่ → แก้ `docker-compose.yml` port mapping
+- Docker Desktop ไม่รัน → เปิดก่อน `docker compose up`
 
-**BCProxyAI ไม่ใช่ "เหมือน GPT-4o" แต่ผสมคุณภาพหลายตัว:**
-
-| % traffic | Quality tier | ตัวอย่าง model |
-|---:|---|---|
-| 35% | Small fast | Groq llama-8b, Qwen2.5-7B, mistral-small |
-| 40% | Mid (70B-120B) | Llama 3.3 70B, Mistral Medium, gpt-oss:120b, Qwen2.5-72B |
-| 20% | Large (235B-480B) | Qwen3-235B, Kimi K2, DeepSeek R1, Llama 3.1 405B, qwen3-coder:480b |
-| 5% | Flagship (671B+) | DeepSeek V3.1 671B (Ollama Cloud), Llama 405B |
-
-**Weighted equivalent quality ≈ Llama 3.3 70B / DeepSeek V3 class**
-
-### เปรียบเทียบ apples-to-apples (Llama 70B class)
-
-**Closest paid equivalent** = DeepSeek V3.2 ($0.14/$0.28) หรือ Llama 70B cheap providers
+### 🔴 HTTP 503 — ไม่มี candidates
 
 ```
-BCProxyAI (ฟรี)     vs  DeepSeek V3.2 paid    = ประหยัด $3,360/mo   (฿117,600)
-BCProxyAI (ฟรี)     vs  Gemini 2.5 Flash      = ประหยัด $4,800/mo   (฿168,000)
-BCProxyAI (ฟรี)     vs  GPT-4o mini           = ประหยัด $4,800/mo   (฿168,000)
+All 0 models from 0 providers failed
 ```
 
-### เปรียบเทียบ worst-case (ถ้าใช้แต่ flagship)
+**สาเหตุ:** ยังไม่มี model ผ่านสอบในระบบ
 
-```
-BCProxyAI (ฟรี)     vs  GPT-4o               = ประหยัด $80,000/mo  (฿2.8M)
-BCProxyAI (ฟรี)     vs  Claude Sonnet 4.6    = ประหยัด $108,000/mo (฿3.78M)
-BCProxyAI (ฟรี)     vs  Claude Opus 4.6      = ประหยัด $180,000/mo (฿6.3M)
-BCProxyAI (ฟรี)     vs  Claude Opus 4 legacy = ประหยัด $540,000/mo (฿18.9M)
-```
+**แก้:**
+```bash
+# 1. ตรวจ provider ที่ตั้ง key แล้ว
+curl -s http://localhost:3334/api/providers | python -m json.tool
 
-### ตัวอย่าง use case จริง
+# 2. Trigger worker scan → exam
+curl -X POST http://localhost:3334/api/worker
 
-**Dev/prototype** (2B tokens/month):
-- BCProxyAI: ฿0
-- Novita 8B: ฿1,400
-- DeepSeek V3.2: ฿11,760
-- GPT-4o: ฿280,000
-- Claude Opus 4.6: ฿630,000
+# 3. รอ 2-5 นาที ให้สอบเสร็จ แล้วตรวจ
+curl -s http://localhost:3334/api/status | python -m json.tool
 
-**Production small** (5B tokens/month):
-- BCProxyAI: ฿0
-- Novita 8B: ฿3,500
-- GPT-4o: ฿700,000
-- Claude Sonnet 4.6: ฿945,000
-
-**Heavy usage** (20B tokens/month = budget เต็ม):
-- BCProxyAI: ฿0
-- Novita 8B: ฿14,000
-- GPT-4o: ฿2,800,000
-- Claude Sonnet 4.6: ฿3,780,000
-- Claude Opus 4: ฿18,900,000 (legacy pricing)
-
-### ROI Summary
-
-**ROI เทียบ tier ต่างๆ (20B tokens/month practical):**
-
-```
-🟢 Lower bound (Novita 8B):     ประหยัด ฿168,000/ปี
-🟡 Mid (DeepSeek V3.2):        ประหยัด ฿1,411,200/ปี
-🟠 GPT-4o mini:                ประหยัด ฿2,016,000/ปี
-🔴 GPT-4o:                     ประหยัด ฿33,600,000/ปี
-🔴 Claude Sonnet 4.6:          ประหยัด ฿45,360,000/ปี
-🔴 Claude Opus 4.6:            ประหยัด ฿75,600,000/ปี
-⚫ Claude Opus 4 legacy:        ประหยัด ฿226,800,000/ปี
+# 4. ดู model ที่ผ่านสอบ
+docker exec bcproxyai-postgres-1 psql -U bcproxy -d bcproxyai -c "
+SELECT m.provider, m.model_id, ea.score_pct::int as score
+FROM models m
+INNER JOIN (SELECT DISTINCT ON (model_id) model_id, score_pct
+            FROM exam_attempts WHERE passed = true
+            ORDER BY model_id, started_at DESC) ea
+ON m.id = ea.model_id
+ORDER BY ea.score_pct DESC LIMIT 20;
+"
 ```
 
-**Sources ราคา (Apr 2026):**
-- [OpenAI Pricing](https://openai.com/api/pricing/) — GPT-4o, GPT-4o mini, GPT-5
-- [Anthropic Pricing](https://platform.claude.com/docs/en/about-claude/pricing) — Claude Haiku/Sonnet/Opus 4.6
-- [Novita AI](https://novita.ai/) — Llama 8B $0.02/1M (ถูกสุดในตลาด)
-- [DeepSeek Pricing](https://platform.deepseek.com/) — V3, V3.2
-- [Google AI Pricing](https://ai.google.dev/pricing) — Gemini Flash/Pro
+### 🔴 HTTP 503 — TPM exhausted
+
+```
+tpm-exhausted: groq/llama-3.1-8b-instant
+```
+
+**สาเหตุ:** Request ขนาดใหญ่เกิน rate limit ของ free tier
+
+**แก้:** เพิ่ม provider ที่ context/TPM สูงกว่า:
+- Chutes.ai (no monthly cap)
+- Mistral (1B tok/month per model)
+- SambaNova (30 RPM × 2.5K tok)
+- Ollama local (unlimited)
+
+### 🔴 Model ตอบช้า / Timeout
+
+**Check:**
+```bash
+# ดู live score + ranking
+curl -s http://localhost:3334/api/live-score
+
+# ดู fail streak
+curl -s http://localhost:3334/api/learning | python -m json.tool
+```
+
+**แก้:**
+- Slow model จะถูก cooldown อัตโนมัติหลัง exponential fails
+- ถ้ายังช้า → toggle provider ปิดผ่าน UI (SetupModal)
+- หรือเพิ่ม per-attempt timeout ใน `route.ts` สำหรับ request ใหญ่
+
+### 🔴 Build fail / TypeScript errors
+
+```bash
+# Clean rebuild
+rm -rf .next node_modules
+npm install
+npx next build
+```
+
+### 🔴 Worker cycle ไม่ run อัตโนมัติ
+
+```bash
+# Manual trigger
+curl -X POST http://localhost:3334/api/worker
+
+# ตรวจ worker state
+curl -s http://localhost:3334/api/status | python -m json.tool | grep -A5 worker
+```
+
+### 🔴 Cooldown หายช้า
+
+Cooldown จะ auto-reset ตามเวลา แต่ถ้าต้องการเคลียร์ทันที:
+
+```bash
+docker exec bcproxyai-postgres-1 psql -U bcproxy -d bcproxyai -c "
+DELETE FROM health_logs WHERE cooldown_until > now();
+DELETE FROM model_fail_streak;
+"
+```
+
+### 🔴 Provider key ใหม่ไม่ถูก scan
+
+```bash
+# 1. ตรวจว่า provider ไม่ถูก toggle ปิด
+curl -s http://localhost:3334/api/providers | python -c "
+import sys, json
+for p in json.load(sys.stdin):
+  print(f\"{p['provider']:15} enabled={p.get('enabled',True)} status={p['status']}\")
+"
+
+# 2. Trigger scan manually
+curl -X POST http://localhost:3334/api/worker
+
+# 3. รอ 30 วินาที แล้วดู log
+docker logs bcproxyai-bcproxyai-1 --tail=50 | grep -i scan
+```
+
+---
+
+## ❓ FAQ
+
+### Q: ต้องใส่ API key กี่ provider ถึงจะพอ?
+**A:** อย่างน้อย **1 ตัว** ก็ใช้ได้ แต่แนะนำ **3+ ตัว** เพื่อมี fallback เวลา 1 ตัวติด cooldown:
+- **Minimum:** Groq (14.4K req/day, ฟรี)
+- **Recommended:** Groq + NVIDIA NIM + Cerebras (คุณภาพผสมหลากหลาย)
+- **Heavy use:** เพิ่ม Mistral + SambaNova + Chutes.ai
+
+### Q: Model อะไรเร็วที่สุด?
+**A:** ตาม live score ระบบจะเลือกเองอัตโนมัติ แต่โดยทั่วไป:
+- **Cerebras** → wafer-scale, ~2000+ tok/s (Llama, Qwen, gpt-oss)
+- **Groq** → LPU, ~500+ tok/s (Llama, Mixtral, Kimi)
+- **SambaNova** → RDU, ~300 tok/s (Llama, Qwen)
+
+### Q: Model อะไรฉลาดที่สุด?
+**A:** ระดับ flagship ที่ฟรี:
+- **DeepSeek V3/R1** (671B) via Ollama Cloud, Chutes.ai, OpenRouter
+- **Qwen3-235B** via Cerebras, NVIDIA NIM, Chutes.ai
+- **Llama 3.1 405B** via Hyperbolic, glhf.chat, SambaNova
+- **Kimi K2** via Groq, Chutes.ai
+
+### Q: รองรับ streaming ไหม?
+**A:** ได้ ส่ง `"stream": true` ใน request → SSE format เหมือน OpenAI
+
+### Q: รองรับ tool calling / function calling ไหม?
+**A:** ได้ ระบบจะเลือก model ที่รองรับ tools อัตโนมัติ (กรองด้วย `supports_tools=1`)
+
+### Q: รองรับ vision (รูปภาพ) ไหม?
+**A:** ได้ ส่ง image_url ใน message → ระบบเลือก vision model (Gemini, Qwen-VL, Llama-Vision)
+
+### Q: Dashboard เข้าจากไหน?
+**A:** `http://localhost:3334/` (ถ้า scale multiple replicas ผ่าน in-compose Caddy)
+หรือ `http://localhost:3333/` (ถ้า deploy ผ่าน external Caddy)
+
+### Q: Scale horizontal ได้ไหม?
+**A:** ได้ ใช้ Redis leader election:
+```bash
+docker compose up -d --scale bcproxyai=3
+```
+
+### Q: Ollama local ต้องติดตั้งยังไง?
+**A:**
+```bash
+# Mac/Windows
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull models
+ollama pull llama3.1
+ollama pull qwen2.5-coder
+
+# Set in .env.local
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+```
+
+### Q: ต้องการเปลี่ยน rate limit เอง?
+**A:** ระบบเรียนรู้ auto จาก response headers + 429 messages ไม่ต้องตั้งเอง
+แต่ถ้าต้องการ override ตั้งใน `src/lib/tpm-tracker.ts` → `MODEL_TPM` map
+
+### Q: Log อยู่ไหน?
+**A:**
+- Worker logs → `worker_logs` table + `/api/status` endpoint
+- Gateway logs → `gateway_logs` table + `/api/gateway-logs` endpoint
+- Container logs → `docker logs bcproxyai-bcproxyai-1`
+- Dashboard → "สมุดจดงาน" panel (realtime)
+
+### Q: จะใช้กับ OpenClaw/Aider/Cline ยังไง?
+**A:** ตั้ง base URL เป็น `http://localhost:3334/v1` + api_key = dummy (ใช้ใดๆ ก็ได้)
+
+### Q: ถ้า provider ล่มจะเป็นไง?
+**A:** ระบบมี 26 providers + exponential cooldown + circuit breaker + relaxed retry
+→ 1 provider ล่ม = fallback ไป provider อื่นอัตโนมัติ
+
+### Q: BCProxyAI เก็บ prompt/response ไหม?
+**A:** เก็บ 500 ตัวอักษรแรก + 500 ตัวอักษรของ assistant response ใน `gateway_logs` (สำหรับ debug/analytics)
+ลบ log เก่า 7 วัน อัตโนมัติ (`cleanOldLogs()`)
+ปิด/แก้ได้ใน `src/app/v1/chat/completions/route.ts`
+
+### Q: ต้อง restart หลังแก้ .env.local ไหม?
+**A:** ต้อง → `docker compose up -d --force-recreate` เพื่อโหลด env ใหม่
+**แต่** ถ้าตั้ง key ผ่าน UI (SetupModal) → ไม่ต้อง restart (เก็บใน DB)
 
 ---
 
