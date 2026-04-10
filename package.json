@@ -17,6 +17,10 @@
     "loadtest:chat": "k6 run loadtest/chat.js",
     "loadtest:ratelimit": "k6 run loadtest/ratelimit.js",
     "loadtest:stress": "k6 run loadtest/stress.js",
+    "loadtest:quality": "k6 run loadtest/quality.js",
+    "loadtest:quality:long": "k6 run loadtest/quality.js --duration 30m --vus 3",
+    "test:quality": "tsx loadtest/quality-test.ts",
+    "test:quality:long": "tsx loadtest/quality-test.ts --rounds=0 --concurrency=3",
     "autoscale": "node scripts/autoscale.mjs"
   },
   "dependencies": {
