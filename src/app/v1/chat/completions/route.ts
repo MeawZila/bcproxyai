@@ -309,7 +309,7 @@ async function getAvailableModels(caps: RequestCapabilities, benchmarkCategory?:
       FROM exam_attempts
       WHERE finished_at IS NOT NULL
       ORDER BY model_id, started_at DESC
-    ) ex ON m.id = ex.model_id AND ex.passed = true
+    ) ex ON m.id = ex.model_id AND ex.passed = true AND ex.score_pct >= 85
     LEFT JOIN (
       SELECT model_id, AVG(latency_ms)::float AS avg_lat_real
       FROM routing_stats
@@ -476,7 +476,7 @@ async function getAllModelsIncludingCooldown(caps: RequestCapabilities): Promise
     FROM models m
     LEFT JOIN (
       SELECT DISTINCT ON (model_id) model_id, score_pct, total_latency_ms
-      FROM exam_attempts WHERE passed = true
+      FROM exam_attempts WHERE passed = true AND score_pct >= 85
       ORDER BY model_id, started_at DESC
     ) ex ON m.id = ex.model_id
     WHERE m.context_length >= 32000
@@ -509,7 +509,7 @@ async function selectModelsByMode(
       FROM models m
       INNER JOIN (
         SELECT DISTINCT ON (model_id) model_id, score_pct, total_latency_ms
-        FROM exam_attempts WHERE passed = true
+        FROM exam_attempts WHERE passed = true AND score_pct >= 85
         ORDER BY model_id, started_at DESC
       ) ex ON m.id = ex.model_id
       LEFT JOIN (
@@ -1131,6 +1131,24 @@ export async function POST(req: NextRequest) {
       console.log(`[CTX-FILTER:${_reqId}] kept=${finalCandidates.length} for ${estTokens}tok`);
     }
 
+    // Minimum context filter — model ที่ ctx < 16K ไม่เหมาะกับ conversation ที่มี history
+    const MIN_CTX = 16_000;
+    const ctxMinFiltered = finalCandidates.filter(c => (c.context_length ?? 0) >= MIN_CTX);
+    if (ctxMinFiltered.length > 0) {
+      const dropped = finalCandidates.length - ctxMinFiltered.length;
+      if (dropped > 0) console.log(`[MIN-CTX:${_reqId}] dropped ${dropped} models with ctx<${MIN_CTX}`);
+      finalCandidates = ctxMinFiltered;
+    }
+
+    // Latency cap — model ที่ exam latency > 30s ช้าเกินใช้งานจริง
+    const MAX_EXAM_LATENCY = 30_000;
+    const latFiltered = finalCandidates.filter(c => (c.avg_latency ?? 0) <= MAX_EXAM_LATENCY || (c.avg_latency ?? 0) === 0);
+    if (latFiltered.length > 0) {
+      const dropped = finalCandidates.length - latFiltered.length;
+      if (dropped > 0) console.log(`[LAT-CAP:${_reqId}] dropped ${dropped} models with exam latency>${MAX_EXAM_LATENCY}ms`);
+      finalCandidates = latFiltered;
+    }
+
     // ─── Provider-first selection ─────────────────────────────────────────
     // ขั้นตอน:
     //   1. ตัดทิ้ง model ที่เพิ่ง fail ติดกัน (isRecentlyDead)
@@ -1157,16 +1175,17 @@ export async function POST(req: NextRequest) {
         const repScores = await Promise.all(models.map(m => getReputationScore(m.id)));
         const avgRep = repScores.reduce((s, r) => s + r, 0) / repScores.length;
 
-        // Weight: live success rate ถ่วงหลัก + benchmark score + inverse latency
+        // Weight: live success rate + exam score (ถ่วงเท่ากัน) + inverse latency
+        // exam_score สำคัญมาก — model 93% ต้องชนะ model 86% แม้จะช้ากว่านิดหน่อย
         // Ollama ดันไปท้ายเสมอ (local ช้า reserve เป็น fallback)
         let weight: number;
         if (prov === "ollama") {
           weight = -Infinity;
         } else {
           weight =
-            liveP.successRate * 100_000 +        // live success rate น้ำหนักสูงสุด
-            avgBenchScore * 1_000 * (avgRep / 100) -  // benchmark + reputation
-            Math.min(liveP.avgLatency, avgBenchLat) / 10; // latency penalty
+            liveP.successRate * 50_000 +          // live success rate (ลดจาก 100K → 50K)
+            avgBenchScore * 3_000 * (avgRep / 100) +  // exam score (เพิ่ม 3x จาก 1K → 3K)
+            Math.min(liveP.avgLatency, avgBenchLat) / -10; // latency penalty
         }
         return { prov, models, weight, liveScore: liveP };
       })
@@ -1188,8 +1207,8 @@ export async function POST(req: NextRequest) {
       const sortedModels = [...models].sort((a, b) => {
         const la = getModelScore(a.id);
         const lb = getModelScore(b.id);
-        const scoreA = la.successRate * 10_000 + (a.avg_score ?? 0) * 100 - Math.min(la.avgLatency, a.avg_latency ?? 9999) / 100;
-        const scoreB = lb.successRate * 10_000 + (b.avg_score ?? 0) * 100 - Math.min(lb.avgLatency, b.avg_latency ?? 9999) / 100;
+        const scoreA = la.successRate * 5_000 + (a.avg_score ?? 0) * 300 - Math.min(la.avgLatency, a.avg_latency ?? 9999) / 100;
+        const scoreB = lb.successRate * 5_000 + (b.avg_score ?? 0) * 300 - Math.min(lb.avgLatency, b.avg_latency ?? 9999) / 100;
         return scoreB - scoreA;
       });
       for (const m of sortedModels) {

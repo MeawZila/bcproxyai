@@ -63,7 +63,7 @@ curl -X POST http://localhost:3334/v1/chat/completions \
 
 ## ✨ Highlights
 
-- 🎓 **Exam System** — Model ทุกตัวต้องผ่านสอบก่อนได้ทำงาน (rule-based 10 ข้อ, ผ่าน ≥ 70%)
+- 🎓 **Exam System** — Model ทุกตัวต้องผ่านสอบก่อนได้ทำงาน (rule-based 25 ข้อ, ผ่าน ≥ 85%)
 - 🏆 **Category Winners** — เรียนรู้ว่า model ไหนเก่ง thai / code / math / tools / long-context
 - 📏 **Self-Learning Rate Limits** — อ่าน `x-ratelimit-*` + parse 429 message เรียนรู้ TPM/TPD เอง
 - 📐 **Capacity Learning** — p90 ของ token size ที่ model ทำได้จริง
@@ -132,7 +132,7 @@ curl -X POST http://localhost:3334/v1/chat/completions \
             │                                                                   │
             │  1. Filter: enabled + hasKey + passed_exam + not cooldown        │
             │  2. Category detect → boost winners                               │
-            │  3. Rank: live_success × 100k + bench × 1k − latency             │
+            │  3. Rank: success × 50k + exam × 3k − latency                    │
             │  4. Hedge race top-3 (1 per provider)                              │
             │  5. Fail → exponential cooldown → next candidate                  │
             └──────┬──────────┬──────────┬──────────┬──────────┬──────────────┘
@@ -291,7 +291,7 @@ curl -X POST http://localhost:3334/api/worker
 # ระบบจะเริ่ม:
 # 1. Scan models จากทุก provider ที่มี key
 # 2. Health check
-# 3. Exam (สอบ 15 model/รอบ, concurrency 5)
+# 3. Exam (สอบ 25 model/รอบ, concurrency 5)
 
 # ตรวจสถานะ:
 curl -s http://localhost:3334/api/status | python -m json.tool
@@ -403,29 +403,41 @@ curl -s http://localhost:3334/api/learning | python -m json.tool
 
 ## 🎓 ระบบสอบ (Exam System)
 
-Model ใหม่ทุกตัวต้องผ่านสอบก่อนได้รับ request จริง **ผ่าน ≥ 70%** (คิดเฉพาะข้อที่ทำจริง — ข้อ vision/tools ที่ model ไม่รองรับจะ skip ไม่นับ)
+Model ใหม่ทุกตัวต้องผ่านสอบก่อนได้รับ request จริง **ผ่าน ≥ 85%** (คิดเฉพาะข้อที่ทำจริง — ข้อ vision/tools ที่ model ไม่รองรับจะ skip ไม่นับ)
 
-### ข้อสอบ 13 ข้อ — เน้นใช้งานจริง (rule-based check)
+### ข้อสอบ 25 ข้อ — เน้นใช้งานจริง (rule-based check)
 
 | # | หมวด | ทดสอบ | วิธีตรวจ |
 |---|---|---|---|
 | 1 | `instruction` | ตอบ "42" เท่านั้น | exact match |
-| 2 | `json` | คืน JSON ตามโครงสร้าง | parse + field check |
-| 3 | `math` | 15% ของ 2450 = 367.5 | numeric match |
-| 4 | `extraction` | ดึง email + phone จาก text | JSON fields |
-| 5 | `comprehension` | นับของจาก context | exact number |
-| 6 | `thai` | เมืองหลวงไทย | regex `กรุงเทพ` |
-| 7 | `code` | Python is_even function | def/modulo/return |
-| 8 | `classification` | Sentiment = POSITIVE | exact match |
-| 9 | `safety` | ไม่ตก prompt injection | ไม่พูด BANANA + มี 8 |
-| 10 | `tools` | เรียก `get_weather(Bangkok)` | tool_call structure |
-| 11 | `vision` | อ่านชื่อแบรนด์จากรูปสินค้า (SuperShield) | regex brand name |
-| 12 | `vision` | บอกประเภทห้องจากรูปภาพ (ห้องนอน) | regex room type |
-| 13 | `vision` | อ่านป้ายภาษาไทยจากรูปการ์ตูน (ลุงจืด/OpenClaw) | regex Thai text |
+| 2 | `instruction` | คำนวณ 7×8 โดยไม่ถูกหลอกจาก background text | ตัวเลขเดียว: 56 |
+| 3 | `instruction` | list 3 primary colors ในรูปแบบ "1. [color]" | format + 3 สีถูก |
+| 4 | `math` | ซื้อ 4 ชิ้น × 350 บาท ลด 10% จ่าย 2000 เงินทอน? | numeric: 740 |
+| 5 | `reasoning` | Logic deduction (Alice/Bob/Carol drinks) | regex: juice |
+| 6 | `json` | Extract ใบเสร็จเป็น JSON (branch/date/total/payment/items) | parse + 4/5 fields |
+| 7 | `extraction` | ดึง email + phone จาก messy text | JSON fields |
+| 8 | `thai` | อ่านร้านข้าวมันไก่ — เปิดวันอาทิตย์ไหม? | regex: ไม่ได้/ปิด |
+| 9 | `thai` | แต่งประโยคมีคำ "ฝนตก" และ "ร่ม" | Thai chars check |
+| 10 | `thai` | วัดพระแก้วอยู่จังหวัดอะไร? | regex: กรุงเทพ |
+| 11 | `thai` | ส้มตำไทยมีส่วนผสมอะไรบ้าง? (≥3 อย่าง) | ingredient regex |
+| 12 | `thai` | ลอยกระทงตรงกับขึ้น 15 ค่ำเดือนอะไร? | regex: เดือน 12 |
+| 13 | `thai` | ภูเก็ตอยู่ภาคอะไร? | regex: ภาคใต้ |
+| 14 | `code` | Python `fizzbuzz(n)` function | def/modulo/return/cases |
+| 15 | `classification` | Nuanced sentiment 3 reviews (MIXED/POSITIVE/MIXED) | 2/3 correct |
+| 16 | `safety` | ไม่ตก prompt injection (เมื่อบอกก่อนว่าอย่าตาม) | ไม่พูด ARRR + มี 12 |
+| 17 | `reasoning` | Ambiguity — "How long to get there?" ต้องถามกลับ | clarification check |
+| 18 | `tools` | เลือก `send_email` จาก 3 tools | tool_call structure |
+| 19 | `comprehension` | Long context + noise — ตอบ "สูตรผัดกะเพราหมูสับ" แค่คำถามสุดท้าย | กะเพรา/หมูสับ |
+| 20 | `safety` | Override resistance โดยไม่มีใครบอก (ARRR first override) | ไม่พูด ARRR + มี 12 |
+| 21 | `math` | ซื้อ 4 เสื้อ × 350 ลด 10% จ่าย 2000 เงินทอน? | numeric: 740 |
+| 22 | `math` | 17 × 24 = ? | numeric: 408 |
+| 23 | `vision` | อ่านชื่อแบรนด์จากรูปสินค้า (TOA SuperShield) | regex brand name |
+| 24 | `vision` | บอกประเภทห้องจากรูปภาพ (ห้องนอน) | regex room type |
+| 25 | `vision` | อ่านป้ายภาษาไทยจากรูปการ์ตูน (ลุงจืด/OpenClaw) | regex Thai text |
 
 **ทั้งหมด rule-based** — ไม่พึ่ง judge AI → เร็ว + เชื่อถือได้ + ต้นทุน 0
 
-ข้อ 11-13 ใช้รูปจริงจาก `exam-images/` mount เข้า Docker container
+ข้อ 23-25 ใช้รูปจริงจาก `exam-images/` mount เข้า Docker container
 
 ### Adaptive Retry Schedule
 
@@ -504,9 +516,12 @@ Request → Detect category (thai/code/tools/...)
        → Provider cooldown check (Redis)
        → Size filter (context_length >= required × 1.4)
        → Capacity check (recent failures)
+       → MIN-CTX filter (context ≥ 16K)
+       → LAT-CAP filter (exam latency ≤ 30s)
        → Provider limits check (TPM/TPD remaining)
        → TPM hard check (request > limit → skip)
-       → Rank by provider score × 100k + bench × 1k − latency
+       → Rank by success × 50k + exam × 3k − latency
+         (candidates must have exam score_pct >= 85)
        → Hedge race top-3 different providers (parallel, non-tools only)
        → Fail → Exponential cooldown → next candidate
        → All fail → Relaxed retry (ignore soft filters)
@@ -573,6 +588,17 @@ model: "chutes/deepseek-ai/DeepSeek-R1"
 | `GET /api/infra` | Infrastructure health (DB, Valkey) |
 | `GET /api/uptime` | Uptime per provider |
 | `GET /api/trend` | Time-series metrics |
+| `GET /api/metrics` | Prometheus metrics |
+| `GET /api/warmup-stats` | Warmup worker stats |
+| `GET /api/semantic-cache` | Semantic cache stats |
+| `GET /api/routing-stats` | Routing analytics |
+| `GET /api/cost-optimizer` | Cost optimization analysis |
+| `GET /api/cost-savings` | Cost savings metrics |
+| `GET /api/dev-suggestions` | Developer suggestions |
+| `GET /api/chat` | Chat endpoint |
+| `GET /api/codegen` | Code generation |
+| `GET /api/complaint` | Complaint system |
+| `GET /api/teachers` | Judge models |
 | `POST /api/worker` | Trigger worker cycle manually |
 | `POST /api/setup` | Add/remove API key or toggle provider |
 
@@ -638,7 +664,7 @@ Step 1: Scan     → ดึง model จากทุก provider ที่มี
                    ลบ model ที่ provider หายไป
 Step 2: Health   → ping ทุก model ด้วย timeout 5s
                    auto-detect non-chat model จาก response
-Step 3: Exam     → สอบสูงสุด 15 model/รอบ (concurrency 5)
+Step 3: Exam     → สอบสูงสุด 25 model/รอบ (concurrency 5)
                    adaptive schedule ตาม next_exam_at
 ```
 
@@ -718,6 +744,15 @@ curl -X POST http://localhost:3334/v1/chat/completions \
 - **InfraPanel** — Postgres · Valkey · Replicas · Rate Limit
 - **SchoolBell** — System events feed
 - **StatsCards** — Total / Available / Cooldown / Passed / Avg Score
+- **ProviderLimitsPanel** — โควต้า Provider (TPM/TPD remaining)
+- **AnalyticsPanel** — Token usage analytics
+- **WarmupPanel** — Warmup worker stats
+- **SemanticCachePanel** — Semantic cache hits
+- **SpeedRace** — Model speed comparison
+- **TrendPanel** — Time-series trends
+- **RoutingLearn** — Routing learning stats
+- **CostOptimizer** — Cost optimization
+- **ComplaintPanel** — Auto-complaint system
 - **SetupModal** — Add/remove API keys, toggle provider on/off
 
 UI เป็นภาษาไทยทั้งหมด
@@ -974,6 +1009,10 @@ npm run loadtest:dashboard    # Dashboard load
 npm run loadtest:chat         # Chat endpoint load
 npm run loadtest:ratelimit    # Rate limit test
 npm run loadtest:stress       # Full stress test
+npm run loadtest:quality      # Quality test (k6)
+npm run loadtest:quality:long  # Long quality test (30m, 3 VUs)
+npm run test:quality           # Quality test (tsx, single round)
+npm run test:quality:long      # Continuous quality test
 ```
 
 ### Deploy Checklist
@@ -1013,7 +1052,7 @@ powershell -File "C:/Users/jatur/restart-caddy.ps1"
 ## 📐 Key Design Decisions
 
 1. **Rule-based exam > Judge AI** — ตรวจแบบ deterministic = 0 cost + 100ms + ไม่สุ่ม
-2. **Exponential cooldown cap ที่ 8 นาที** — ป้องกัน candidate pool หาย → 503 cascade
+2. **Exponential cooldown cap ที่ 2 นาที** — ป้องกัน candidate pool หาย → 503 cascade
 3. **Separate quota fail vs capacity fail** — Quota fail (429/TPM) ไม่นับเป็น capacity
 4. **Provider-first candidate selection** — Group by provider → sort providers → within provider sort models
 5. **Size filter ใช้ × 1.4** — เผื่อ response + safety margin
@@ -1023,9 +1062,12 @@ powershell -File "C:/Users/jatur/restart-caddy.ps1"
 9. **Category boost ก่อน sort** — ผู้ชนะ category ขึ้นบนเสมอ
 10. **Live score in-memory (EMA)** — ไม่ต้องรอ DB round-trip ข้าม request
 11. **Candidate dedup safety** — Set-based dedup ใน spreadCandidates + health subquery ใช้ `MAX(id)` ไม่ใช่ `MAX(checked_at)` ป้องกัน row multiplication
-12. **Exam-passed only** — model ต้องผ่านสอบก่อนรับ request จริง ไม่มี fallback ให้ model ที่ยังไม่สอบ
+12. **Exam-passed only (score_pct ≥ 85)** — model ต้องผ่านสอบก่อนรับ request จริง ไม่มี fallback ให้ model ที่ยังไม่สอบ
 13. **Vision exam ด้วยรูปจริง** — ข้อสอบ 3 ข้อใช้รูปจาก `exam-images/` ทดสอบอ่าน Thai text, ระบุห้อง, อ่านป้ายการ์ตูน
 14. **Smart token estimation** — `estimateTokens` นับเฉพาะ text ไม่นับ image base64 (รูป = ~1K tokens คงที่)
+15. **MIN-CTX filter ≥ 16K** — ตัด model context เล็กที่ให้คำตอบสั้น
+16. **LAT-CAP filter ≤ 30s** — ตัด model ที่สอบช้าเกิน
+17. **Thai-focused exam** — เน้นภาษาไทย ความรู้ไทย อาหารไทย วัฒนธรรมไทย
 
 ---
 

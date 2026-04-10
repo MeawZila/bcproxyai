@@ -24,19 +24,14 @@ When writing/rewriting README.md, AGENTS.md, or any docs file: describe ONLY wha
 
 The sml-gateway container exposes only internal port 3000; host traffic routes through the in-compose `caddy` service. Scale with `docker compose up -d --scale sml-gateway=N`.
 
-## Deploy workflow
+## Deploy + verify (never claim "done" without all 3 passing)
 ```bash
-rtk npx next build           # verify 0 errors first
+rtk npx next build           # (1) must return 0 errors
 rtk docker compose up -d --build
-sleep 5 && curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3334/
+sleep 5 && curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3334/  # (2) must return 200
+# (3) container must be `Up` — not `Restarting` or `Exited`
 ```
-Container name: `sml-gateway-sml-gateway-1`. OpenClaw container: `openclaw-bcproxy-test`.
-
-## Verification before "done"
-Never claim work is complete without:
-1. Build returning 0 errors (`rtk npx next build`)
-2. HTTP 200 from the affected route (curl)
-3. Container `Up` (not `Restarting` or `Exited`)
+Container: `sml-gateway-sml-gateway-1`. OpenClaw: `openclaw-bcproxy-test`.
 
 ## Caddy reload
 Caddyfile changes need: `powershell -File "C:/Users/jatur/restart-caddy.ps1"`. Caddy logs at `caddy.log` / `caddy.err.log` (gitignored).
