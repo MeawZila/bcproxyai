@@ -56,7 +56,163 @@ import { DevSuggestionsPanel } from "../components/DevSuggestionsPanel";
 
 // ─── Gateway Config Card ───────────────────────────────────────────────────────
 
-const ONBOARD_CMD_DOCKER = `docker exec <openclaw-container> \\
+type ConfigTab = "nextjs" | "python" | "curl" | "openclaw" | "langchain" | "any";
+
+const CONFIG_SNIPPETS: Record<ConfigTab, { label: string; lang: string; code: string; note?: string }> = {
+  nextjs: {
+    label: "Next.js / Node",
+    lang: "typescript",
+    code: `import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "http://localhost:3334/v1",
+  apiKey: "dummy",            // ไม่ต้องใช้ key จริง
+});
+
+// --- Text ---
+const chat = await client.chat.completions.create({
+  model: "auto",              // gateway เลือกตัวดีสุดให้
+  messages: [{ role: "user", content: "สวัสดีครับ" }],
+});
+console.log(chat.choices[0].message.content);
+
+// --- Vision ---
+const vision = await client.chat.completions.create({
+  model: "auto",
+  messages: [{
+    role: "user",
+    content: [
+      { type: "text", text: "อธิบายรูปนี้" },
+      { type: "image_url", image_url: { url: "data:image/png;base64,..." } },
+    ],
+  }],
+});
+
+// --- Tool Calling ---
+const tools = await client.chat.completions.create({
+  model: "auto",
+  messages: [{ role: "user", content: "กรุงเทพอากาศเป็นยังไง" }],
+  tools: [{
+    type: "function",
+    function: {
+      name: "get_weather",
+      description: "ดูสภาพอากาศ",
+      parameters: {
+        type: "object",
+        properties: { city: { type: "string" } },
+        required: ["city"],
+      },
+    },
+  }],
+});
+
+// --- Streaming ---
+const stream = await client.chat.completions.create({
+  model: "auto",
+  messages: [{ role: "user", content: "เล่านิทานสั้นๆ" }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+}`,
+    note: "npm install openai",
+  },
+  python: {
+    label: "Python",
+    lang: "python",
+    code: `from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:3334/v1",
+    api_key="dummy",            # ไม่ต้องใช้ key จริง
+)
+
+# --- Text ---
+chat = client.chat.completions.create(
+    model="auto",               # gateway เลือกตัวดีสุดให้
+    messages=[{"role": "user", "content": "สวัสดีครับ"}],
+)
+print(chat.choices[0].message.content)
+
+# --- Vision ---
+vision = client.chat.completions.create(
+    model="auto",
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "อธิบายรูปนี้"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}},
+        ],
+    }],
+)
+
+# --- Tool Calling ---
+tools = client.chat.completions.create(
+    model="auto",
+    messages=[{"role": "user", "content": "กรุงเทพอากาศเป็นยังไง"}],
+    tools=[{
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "ดูสภาพอากาศ",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        },
+    }],
+)
+
+# --- Streaming ---
+stream = client.chat.completions.create(
+    model="auto",
+    messages=[{"role": "user", "content": "เล่านิทานสั้นๆ"}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")`,
+    note: "pip install openai",
+  },
+  curl: {
+    label: "cURL",
+    lang: "bash",
+    code: `# --- Text ---
+curl http://localhost:3334/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "สวัสดีครับ"}]
+  }'
+
+# --- Vision ---
+curl http://localhost:3334/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto",
+    "messages": [{
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "อธิบายรูปนี้"},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+      ]
+    }]
+  }'
+
+# --- Streaming ---
+curl http://localhost:3334/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "เล่านิทานสั้นๆ"}],
+    "stream": true
+  }'`,
+  },
+  openclaw: {
+    label: "OpenClaw",
+    lang: "bash",
+    code: `# Docker — OpenClaw อยู่คนละ container
+docker exec <openclaw-container> \\
   openclaw onboard \\
   --non-interactive --accept-risk \\
   --auth-choice custom-api-key \\
@@ -66,9 +222,10 @@ const ONBOARD_CMD_DOCKER = `docker exec <openclaw-container> \\
   --custom-compatibility openai \\
   --skip-channels --skip-daemon \\
   --skip-health --skip-search \\
-  --skip-skills --skip-ui`;
+  --skip-skills --skip-ui
 
-const ONBOARD_CMD_LOCAL = `openclaw onboard \\
+# Local — OpenClaw รันบนเครื่องเดียวกัน
+openclaw onboard \\
   --non-interactive --accept-risk \\
   --auth-choice custom-api-key \\
   --custom-base-url http://localhost:3333/v1 \\
@@ -77,19 +234,79 @@ const ONBOARD_CMD_LOCAL = `openclaw onboard \\
   --custom-compatibility openai \\
   --skip-channels --skip-daemon \\
   --skip-health --skip-search \\
-  --skip-skills --skip-ui`;
+  --skip-skills --skip-ui`,
+    note: "Docker ใช้ host.docker.internal แทน localhost",
+  },
+  langchain: {
+    label: "LangChain",
+    lang: "python",
+    code: `from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://localhost:3334/v1",
+    api_key="dummy",
+    model="auto",
+)
+
+# --- Text ---
+response = llm.invoke("สวัสดีครับ")
+print(response.content)
+
+# --- With Tools ---
+from langchain_core.tools import tool
+
+@tool
+def get_weather(city: str) -> str:
+    """ดูสภาพอากาศ"""
+    return f"{city}: 35°C แดดจัด"
+
+llm_with_tools = llm.bind_tools([get_weather])
+result = llm_with_tools.invoke("กรุงเทพอากาศเป็นยังไง")
+print(result.tool_calls)
+
+# --- Streaming ---
+for chunk in llm.stream("เล่านิทานสั้นๆ"):
+    print(chunk.content, end="")`,
+    note: "pip install langchain-openai",
+  },
+  any: {
+    label: "ทุก Framework",
+    lang: "text",
+    code: `┌─────────────────────────────────────────────┐
+│  SMLGateway = OpenAI-compatible API         │
+│  ใช้ได้กับทุก library ที่รองรับ OpenAI SDK    │
+└─────────────────────────────────────────────┘
+
+Endpoint:    http://localhost:3334/v1/chat/completions
+API Key:     dummy  (ใส่อะไรก็ได้ ไม่ต้อง auth)
+Model:       auto   (หรือเลือก model เฉพาะได้)
+
+รองรับ:
+  POST /v1/chat/completions   — Chat (text, vision, tools, stream)
+  GET  /v1/models              — รายชื่อ model ทั้งหมด
+
+ตัวอย่าง config ใน framework ต่างๆ:
+  Vercel AI SDK:  createOpenAI({ baseURL: "...", apiKey: "dummy" })
+  LiteLLM:        model="openai/auto", api_base="..."
+  Dify:           Custom Model Provider → OpenAI-compatible
+  LobeChat:       Settings → OpenAI → Base URL
+  AutoGen:        config_list: [{ base_url: "...", api_key: "dummy" }]`,
+  },
+};
 
 function GatewayConfigCard() {
+  const [activeTab, setActiveTab] = useState<ConfigTab>("nextjs");
   const [copied, setCopied] = useState(false);
-  const [configMode, setConfigMode] = useState<"docker" | "local">("docker");
-  const currentConfig = configMode === "docker" ? ONBOARD_CMD_DOCKER : ONBOARD_CMD_LOCAL;
+  const snippet = CONFIG_SNIPPETS[activeTab];
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(currentConfig).then(() => {
+    navigator.clipboard.writeText(snippet.code).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  const tabOrder: ConfigTab[] = ["nextjs", "python", "curl", "langchain", "openclaw", "any"];
 
   return (
     <div
@@ -100,42 +317,56 @@ function GatewayConfigCard() {
         borderRadius: "1rem",
         padding: "1.5rem",
         marginTop: "1.5rem",
-        maxWidth: "48rem",
-        marginLeft: "auto",
-        marginRight: "auto",
       }}
     >
+      {/* Header */}
       <div style={{ marginBottom: "0.75rem" }}>
         <span style={{ fontSize: "0.75rem", color: "rgb(165,180,252)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
           Gateway Config
         </span>
         <p style={{ fontSize: "0.875rem", color: "rgb(156,163,175)", marginTop: "0.25rem" }}>
-          เชื่อมต่อ OpenClaw กับ SMLGateway — รันคำสั่งนี้ใน OpenClaw:
+          SMLGateway เป็น OpenAI-compatible API — เชื่อมต่อได้ทุก framework ที่รองรับ OpenAI SDK
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
-        {([["docker", "OpenClaw บน Docker"], ["local", "OpenClaw บนเครื่อง"]] as const).map(([mode, label]) => (
+      {/* Connection Info */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>
+        {[
+          { label: "Base URL", value: "http://localhost:3334/v1", color: "rgb(129,140,248)" },
+          { label: "API Key", value: "dummy (ใส่อะไรก็ได้)", color: "rgb(251,191,36)" },
+          { label: "Model", value: "auto", color: "rgb(110,231,183)" },
+        ].map((info) => (
+          <div key={info.label} style={{ background: "rgba(0,0,0,0.3)", borderRadius: "0.5rem", padding: "0.5rem 0.75rem" }}>
+            <div style={{ fontSize: "0.65rem", color: "rgb(107,114,128)", fontWeight: 600, textTransform: "uppercase" }}>{info.label}</div>
+            <code style={{ fontSize: "0.8rem", color: info.color, fontFamily: "var(--font-geist-mono), monospace" }}>{info.value}</code>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", marginBottom: "0.75rem" }}>
+        {tabOrder.map((tab) => (
           <button
-            key={mode}
-            onClick={() => { setConfigMode(mode); setCopied(false); }}
+            key={tab}
+            onClick={() => { setActiveTab(tab); setCopied(false); }}
             style={{
               padding: "0.375rem 0.75rem",
               borderRadius: "0.5rem",
               fontSize: "0.75rem",
               fontWeight: 600,
               cursor: "pointer",
-              border: `1px solid ${configMode === mode ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.1)"}`,
-              background: configMode === mode ? "rgba(99,102,241,0.2)" : "transparent",
-              color: configMode === mode ? "rgb(165,180,252)" : "rgb(107,114,128)",
+              border: `1px solid ${activeTab === tab ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.1)"}`,
+              background: activeTab === tab ? "rgba(99,102,241,0.2)" : "transparent",
+              color: activeTab === tab ? "rgb(165,180,252)" : "rgb(107,114,128)",
               transition: "all 0.2s",
             }}
           >
-            {label}
+            {CONFIG_SNIPPETS[tab].label}
           </button>
         ))}
       </div>
 
+      {/* Code Block */}
       <div style={{ position: "relative" }}>
         <pre
           style={{
@@ -144,13 +375,16 @@ function GatewayConfigCard() {
             borderRadius: "0.5rem",
             padding: "1rem",
             fontFamily: "var(--font-geist-mono), monospace",
-            fontSize: "0.8rem",
+            fontSize: "0.75rem",
+            lineHeight: "1.5",
             color: "rgb(209,213,219)",
             overflowX: "auto",
             margin: 0,
+            maxHeight: "28rem",
+            overflowY: "auto",
           }}
         >
-          {currentConfig}
+          {snippet.code}
         </pre>
         <button
           onClick={handleCopy}
@@ -169,35 +403,34 @@ function GatewayConfigCard() {
             transition: "all 0.2s",
           }}
         >
-          {copied ? "คัดลอกแล้ว ✓" : "คัดลอก"}
+          {copied ? "คัดลอกแล้ว \u2713" : "คัดลอก"}
         </button>
       </div>
 
-      <p style={{ fontSize: "0.7rem", color: "rgb(251,191,36)", marginTop: "0.5rem" }}>
-        {configMode === "docker"
-          ? "* ใช้ host.docker.internal แทน localhost เพราะ OpenClaw อยู่คนละ container"
-          : "* ใช้ localhost ได้เลย เพราะ OpenClaw รันบนเครื่องเดียวกัน"}
-      </p>
-      <p style={{ fontSize: "0.7rem", color: "rgb(156,163,175)", marginTop: "0.25rem" }}>
-        หลังรันคำสั่ง OpenClaw จะตั้งค่า provider ให้อัตโนมัติ (api: openai-completions, contextWindow: 131072)
-      </p>
+      {/* Install note */}
+      {snippet.note && (
+        <p style={{ fontSize: "0.7rem", color: "rgb(251,191,36)", marginTop: "0.5rem" }}>
+          * {snippet.note}
+        </p>
+      )}
 
-      <div style={{ marginTop: "1rem" }}>
+      {/* Special Models */}
+      <div style={{ marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
         <p style={{ fontSize: "0.75rem", color: "rgb(107,114,128)", marginBottom: "0.5rem", fontWeight: 600 }}>
           โมเดลพิเศษ:
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.25rem 1rem" }}>
           {[
-            { id: "auto",           desc: "เลือกตัวดีสุดอัตโนมัติ" },
-            { id: "sml/fast",   desc: "เร็วที่สุด" },
-            { id: "sml/tools",  desc: "รองรับ tool calling" },
-            { id: "sml/thai",   desc: "เก่งภาษาไทย" },
+            { id: "auto", desc: "เลือกตัวดีสุดอัตโนมัติ (แนะนำ)" },
+            { id: "sml/fast", desc: "เร็วที่สุด (low latency)" },
+            { id: "sml/tools", desc: "รองรับ tool calling" },
+            { id: "sml/thai", desc: "เก่งภาษาไทย" },
           ].map((m) => (
-            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <code style={{ fontSize: "0.75rem", color: "rgb(129,140,248)", fontFamily: "var(--font-geist-mono), monospace", minWidth: "10rem" }}>
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <code style={{ fontSize: "0.75rem", color: "rgb(129,140,248)", fontFamily: "var(--font-geist-mono), monospace", minWidth: "7rem" }}>
                 {m.id}
               </code>
-              <span style={{ fontSize: "0.75rem", color: "rgb(156,163,175)" }}>— {m.desc}</span>
+              <span style={{ fontSize: "0.7rem", color: "rgb(156,163,175)" }}>{m.desc}</span>
             </div>
           ))}
         </div>
@@ -422,6 +655,7 @@ export default function Dashboard() {
           {/* Row 2: Nav links — wrappable */}
           <div className="flex flex-wrap gap-1 pb-2">
             {[
+              { id: "gateway-config", icon: "\u2699\uFE0F", label: "คู่มือเชื่อมต่อ" },
               { id: "gateway-logs",  icon: "\u{1F4DD}", label: "สมุดจดงาน" },
               { id: "codegen",       icon: "\u{1F4BE}", label: "โค้ดระบบ" },
               { id: "dev-suggestions", icon: "\u{1F4A1}", label: "คำแนะนำ Dev" },
@@ -462,6 +696,15 @@ export default function Dashboard() {
 
         {/* ── Live Mascot Theater (data-driven from gateway logs) ───────── */}
         <MascotScene />
+
+        {/* ── Gateway Config (connection guide) ──────────────────────────── */}
+        <section id="gateway-config" className="animate-fade-in-up stagger-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-2xl">{"\u2699\uFE0F"}</span>
+            <span className="font-black text-white text-3xl">คู่มือเชื่อมต่อ</span>
+          </div>
+          <GatewayConfigCard />
+        </section>
 
         {/* ── Gateway Logs (top of dashboard, wide + big font) ──────────── */}
         <section id="gateway-logs" className="animate-fade-in-up stagger-0">
@@ -657,8 +900,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Gateway Config */}
-          <GatewayConfigCard />
+          {/* Gateway Config — ย้ายไปเป็น section แยก #gateway-config */}
 
           {/* Cost Savings Card */}
           {costSavings && costSavings.totalTokens > 0 && (
