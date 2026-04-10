@@ -22,6 +22,7 @@ services:
         condition: service_healthy
     volumes:
       - sml-gateway-data:/app/data
+      - ./exam-images:/app/exam-images:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 10s

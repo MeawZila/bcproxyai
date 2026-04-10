@@ -17,28 +17,30 @@ const MODEL_TPM: Record<string, number> = {
   "cerebras:llama-3.3-70b":              60_000,
 };
 
+// TPM fallback per provider — Infinity = no hard TPM limit (ให้ provider 429 เองถ้าเกิน)
+// เฉพาะ provider ที่มี hard TPM limit จริงๆ ถึงจะตั้งค่า
 const PROVIDER_TPM_FALLBACK: Record<string, number> = {
-  groq: 30_000,
-  cerebras: 60_000,
-  mistral: 500_000,    // Mistral ไม่มี hard TPM — ใช้ค่าสูงเพื่อ skip tracking
-  openrouter: 500_000, // ต่อ key ไม่ track
-  sambanova: 30_000,
-  kilo: 50_000,
-  ollama: Infinity,    // local, no limit
-  google: 30_000,
-  nvidia: 100_000,
-  chutes: 500_000,
-  llm7: 50_000,
-  scaleway: 500_000,
-  pollinations: 100_000,
-  ollamacloud: 128_000,
-  siliconflow: 50_000,
-  glhf: 500_000,
-  together: 200_000,
-  hyperbolic: 200_000,
-  zai: 500_000,
-  dashscope: 500_000,
-  reka: 200_000,
+  groq: 30_000,         // strict free tier per-model
+  cerebras: 60_000,     // strict free tier
+  sambanova: 30_000,    // 30 RPM, limited tokens
+  google: 30_000,       // 5-15 RPM, limited TPM
+  mistral: Infinity,    // 1B tok/mo, 1 RPS — no hard TPM
+  openrouter: Infinity, // per-key, no TPM tracking needed
+  nvidia: Infinity,     // credit-based, no TPM
+  chutes: Infinity,     // unlimited community GPU
+  llm7: Infinity,       // RPM-based, not TPM
+  scaleway: Infinity,   // credit-based
+  pollinations: Infinity, // no hard limit
+  ollamacloud: Infinity,  // per-hour, not per-minute
+  siliconflow: Infinity,
+  glhf: Infinity,
+  together: Infinity,
+  hyperbolic: Infinity,
+  zai: Infinity,
+  dashscope: Infinity,
+  reka: Infinity,
+  kilo: Infinity,
+  ollama: Infinity,     // local
 };
 
 const WINDOW_MS = 60_000;

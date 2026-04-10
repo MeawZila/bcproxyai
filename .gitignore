@@ -37,6 +37,10 @@ yarn-error.log*
 # database
 /data/
 
+# exam images (user-provided, not tracked)
+/exam-images/*
+!/exam-images/.gitkeep
+
 # caddy runtime logs
 caddy.log
 caddy.err.log
