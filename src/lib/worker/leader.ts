@@ -9,7 +9,7 @@ import { getRedis } from "@/lib/redis";
 // still run the cycle.
 
 const LEADER_KEY = "worker:leader";
-const LEADER_TTL_SEC = 55 * 60; // 55 minutes — shorter than the 1h cycle
+const LEADER_TTL_SEC = 14 * 60; // 14 minutes — shorter than the 15min cycle
 
 function workerId(): string {
   // HOSTNAME is set by Docker to the container ID
