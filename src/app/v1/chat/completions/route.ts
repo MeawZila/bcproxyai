@@ -865,22 +865,14 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-real-ip")?.trim()
       ?? xffChain[xffChain.length - 1]
       ?? "unknown";
-    const rl = await checkRateLimit(`chat:${ip}`, 100, 60);
-    if (!rl.allowed) {
-      return new Response(
-        JSON.stringify({ error: { message: "Rate limit exceeded. Try again in a moment.", type: "rate_limit_exceeded", code: "rate_limit_exceeded" } }),
-        {
-          status: 429,
-          headers: {
-            "Content-Type": "application/json",
-            "X-RateLimit-Limit": "100",
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.floor(Date.now() / 1000) + rl.resetIn),
-            "Access-Control-Allow-Origin": "*",
-          },
-        }
-      );
-    }
+    // Soft rate limit: never hard-block, but emit X-Resceo-Backoff: true as a
+    // voluntary backoff hint once the client exceeds a low soft threshold.
+    // Upstream providers still impose hard ceilings (~5 calls/min) — this header
+    // lets well-behaved clients slow down before they hit upstream 429s.
+    const HARD_LIMIT = 100_000;
+    const SOFT_LIMIT = Number(process.env.GATEWAY_SOFT_RATE_LIMIT ?? "4");
+    const rl = await checkRateLimit(`chat:${ip}`, HARD_LIMIT, 60);
+    const softBackoff = (HARD_LIMIT - rl.remaining) > SOFT_LIMIT;
 
     // Fix B: Fire-and-forget — put known-stale Cerebras models on 365-day cooldown
     if (!_staleModelsCleanedUp) {
@@ -906,6 +898,7 @@ export async function POST(req: NextRequest) {
       cacheHeaders.set("X-SMLGateway-Provider", cachedHit.provider);
       cacheHeaders.set("X-SMLGateway-Model", cachedHit.model);
       cacheHeaders.set("X-SMLGateway-Cache", "HIT");
+      if (softBackoff) cacheHeaders.set("X-Resceo-Backoff", "true");
       cacheHeaders.set("Access-Control-Allow-Origin", "*");
       const cacheBody = {
         id: `chatcmpl-cache-${Date.now()}`,
@@ -984,6 +977,7 @@ export async function POST(req: NextRequest) {
           headers.set("X-SMLGateway-Provider", best.model.provider);
           headers.set("X-SMLGateway-Model", best.model.model_id);
           headers.set("X-SMLGateway-Consensus", valid.map((v) => `${v.model.provider}/${v.model.model_id}(${v.content.length}chars/${v.latency}ms)`).join(", "));
+          if (softBackoff) headers.set("X-Resceo-Backoff", "true");
           headers.set("Access-Control-Allow-Origin", "*");
           return new Response(JSON.stringify(best.json), { status: 200, headers });
         }
@@ -1009,7 +1003,7 @@ export async function POST(req: NextRequest) {
         return openAIError(response.status, { message: errText || `Provider ${provider} returned ${response.status}` });
       }
       console.log(`[RES:${_reqId}] ${response.status} | ${provider}/${modelId} | ${Date.now() - _reqTime}ms | direct`);
-      return buildProxiedResponse(response, provider!, modelId!, isStream, estInputTokens);
+      return buildProxiedResponse(response, provider!, modelId!, isStream, estInputTokens, softBackoff);
     }
 
     // ---- Match by model string ----
@@ -1030,7 +1024,7 @@ export async function POST(req: NextRequest) {
         return openAIError(response.status, { message: errText || `Provider ${row.provider} returned ${response.status}` });
       }
       console.log(`[RES:${_reqId}] ${response.status} | ${row.provider}/${row.model_id} | ${Date.now() - _reqTime}ms | match`);
-      return buildProxiedResponse(response, row.provider, row.model_id, isStream, estInputTokens);
+      return buildProxiedResponse(response, row.provider, row.model_id, isStream, estInputTokens, softBackoff);
     }
 
     // ---- Smart routing: auto / fast / tools / thai ----
@@ -1182,6 +1176,17 @@ export async function POST(req: NextRequest) {
       const dropped = finalCandidates.length - latFiltered.length;
       if (dropped > 0) console.log(`[LAT-CAP:${_reqId}] dropped ${dropped} models with exam latency>${MAX_EXAM_LATENCY}ms`);
       finalCandidates = latFiltered;
+    }
+
+    // Vision filter — ตัด vision-specialized models ออกเมื่อ request ไม่มีรูป
+    // (vision models ช้า 20-30s สำหรับ text-only request)
+    if (!caps.hasImages && finalCandidates.length > 3) {
+      const noVision = finalCandidates.filter(c => !/-vision[-\d]/i.test(c.model_id));
+      if (noVision.length >= 3) {
+        const dropped = finalCandidates.length - noVision.length;
+        if (dropped > 0) console.log(`[VISION-FILTER:${_reqId}] dropped ${dropped} vision-only models (no image in request)`);
+        finalCandidates = noVision;
+      }
     }
 
     // ─── Provider-first selection ─────────────────────────────────────────
@@ -1367,6 +1372,7 @@ export async function POST(req: NextRequest) {
             hedgeHeaders.set("X-SMLGateway-Provider", winner.provider);
             hedgeHeaders.set("X-SMLGateway-Model", winner.model_id);
             hedgeHeaders.set("X-SMLGateway-Hedge", "true");
+            if (softBackoff) hedgeHeaders.set("X-Resceo-Backoff", "true");
             hedgeHeaders.set("Access-Control-Allow-Origin", "*");
             const _hpt = usage?.prompt_tokens ?? 0; const _hct = usage?.completion_tokens ?? 0;
             const _htc = Array.isArray(json.choices?.[0]?.message?.tool_calls) ? json.choices[0].message.tool_calls.length : 0;
@@ -1567,6 +1573,7 @@ export async function POST(req: NextRequest) {
               headers.set("Content-Type", "application/json");
               headers.set("X-SMLGateway-Provider", provider);
               headers.set("X-SMLGateway-Model", actualModelId);
+              if (softBackoff) headers.set("X-Resceo-Backoff", "true");
               headers.set("Access-Control-Allow-Origin", "*");
 
               if (json.choices) {
@@ -1598,7 +1605,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          const proxied = await buildProxiedResponse(response, provider, actualModelId, isStream, estInputTokens);
+          const proxied = await buildProxiedResponse(response, provider, actualModelId, isStream, estInputTokens, softBackoff);
           const streamLatency = Date.now() - startTime;
           await recordRoutingResult(dbModelId, provider, promptCategory, true, streamLatency);
           recordOutcome(provider, actualModelId, true, streamLatency);
@@ -1754,7 +1761,7 @@ export async function POST(req: NextRequest) {
             recordOutcome(provider, actualModelId, true, streamLatency);
             await logGateway(modelField, actualModelId, provider, 200, streamLatency, 0, 0, null, userMsg, "[relaxed-retry]");
             console.log(`[RES:${_reqId}] 200 | ${provider}/${actualModelId} | ${streamLatency}ms | relaxed-retry stream | Q:"${_reqMsg}"`);
-            return buildProxiedResponse(response, provider, actualModelId, isStream, estInputTokens);
+            return buildProxiedResponse(response, provider, actualModelId, isStream, estInputTokens, softBackoff);
           }
           const errText = await response.text().catch(() => "");
           lastError = `${provider}/${actualModelId}: HTTP ${response.status}`;
@@ -1802,12 +1809,14 @@ async function buildProxiedResponse(
   provider: string,
   modelId: string,
   stream: boolean,
-  estimatedInputTokens = 0
+  estimatedInputTokens = 0,
+  softBackoff = false
 ): Promise<Response> {
   const headers = new Headers();
   headers.set("Content-Type", upstream.headers.get("Content-Type") || "application/json");
   headers.set("X-SMLGateway-Provider", provider);
   headers.set("X-SMLGateway-Model", modelId);
+  if (softBackoff) headers.set("X-Resceo-Backoff", "true");
   headers.set("Access-Control-Allow-Origin", "*");
 
   if (stream && upstream.body) {

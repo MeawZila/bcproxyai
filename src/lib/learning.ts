@@ -298,10 +298,12 @@ export function detectCategory(
   if (hasTools) return "tools";
   if (hasImages) return "vision";
   if (estTokens > 20000) return "long-context";
-  if (estTokens > 5000) return "medium-context";
 
+  // Check Thai/business before medium-context — most Thai prompts are medium-size
   const msg = userMessage.slice(0, 500);
-  if (/[\u0E00-\u0E7F]{3,}/.test(msg)) return "thai";
+  if (/[\u0E00-\u0E7F]{3,}|งาน:|ฝ่าย|สต๊อก|ลูกค้า|SKU/.test(msg)) return "thai";
+
+  if (estTokens > 5000) return "medium-context";
   if (/```|function\s|class\s|def\s|import\s|const\s/.test(msg)) return "code";
   if (/\d+\s*[+\-*\/=]\s*\d+|calculate|equation|คำนวณ/i.test(msg)) return "math";
   if (/translate|แปล/i.test(msg)) return "translate";

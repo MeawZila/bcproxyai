@@ -5,8 +5,9 @@ import { getSqlClient } from "@/lib/db/schema";
  * Detects what kind of prompt the user sent
  */
 const CATEGORY_PATTERNS: [string, RegExp[]][] = [
-  ["code", [/```/, /function\s/, /class\s/, /import\s/, /const\s/, /def\s/, /console\.log/, /return\s/, /เขียนโค้ด/i, /write.*code/i]],
-  ["thai", [/[\u0E00-\u0E7F]{3,}/]],
+  // thai checked first — strong signal; also catches business/ERP prompts in Thai
+  ["thai", [/[\u0E00-\u0E7F]{3,}/, /งาน:/, /ฝ่าย/, /สต๊อก/, /ลูกค้า/, /จัดซื้อ/, /SKU/, /ต้นทุน/, /ใบเสนอ/, /พ่วงขาย/, /แจ้งเตือน/, /ต่อรอง/, /สินค้า/]],
+  ["code", [/```/, /function\s/, /class\s/, /import\s/, /def\s/, /console\.log/, /return\s/, /เขียนโค้ด/i, /write.*code/i]],
   ["math", [/\d+\s*[\+\-\*\/\=]\s*\d+/, /equation/, /calculate/, /formula/i, /คำนวณ/, /สมการ/]],
   ["creative", [/write\s+a\s+(story|poem|song)/i, /creative/i, /imagine/i, /fiction/i, /แต่ง/, /กลอน/, /นิทาน/]],
   ["instruction", [/json/i, /format/i, /ตอบเป็น/, /ตามรูปแบบ/]],
