@@ -1,12 +1,13 @@
 # SMLGateway — OpenAI-Compatible API Guide
 
 > Drop-in replacement สำหรับ OpenAI API — ใช้กับ app ใดก็ได้ที่รองรับ OpenAI format
-> รวม 13 providers ฟรี, smart routing, auto-retry, fallback อัตโนมัติ
+> รวมโมเดลฟรีจาก 21 providers, smart routing, per-category teacher, hedge top-3, auto-retry, fallback
 
 ## Base URL
 
 ```
-http://<your-server>:3333/v1
+http://localhost:3334/v1      # in-compose Caddy (recommended)
+http://localhost:3333/v1      # external Caddy (if configured, 300s timeout)
 ```
 
 ตั้ง `OPENAI_API_BASE` หรือ `base_url` ใน client เป็น URL นี้
@@ -18,7 +19,9 @@ Authorization: Bearer <any-string>
 ```
 
 SMLGateway ไม่ตรวจ API key ของ client — ใส่อะไรก็ได้ (หรือไม่ใส่ก็ได้)
-Key ของ provider แต่ละตัวตั้งใน environment หรือ dashboard
+Key ของ provider แต่ละตัวตั้งใน environment (`.env.local`) หรือ dashboard (`/` → ผู้ให้บริการ)
+
+**Local-only** — ออกแบบรันบน Docker Desktop เครื่องเดียว ไม่มี multi-tenant / public deploy
 
 ---
 
@@ -36,7 +39,7 @@ POST /v1/chat/completions
 
 ```jsonc
 {
-  "model": "auto",                    // หรือ "sml/auto", "sml/fast", "sml/tools", "sml/thai"
+  "model": "sml/auto",                // virtual model หรือ "provider/model_id"
   "messages": [
     { "role": "system", "content": "You are a helpful assistant." },
     { "role": "user", "content": "สวัสดี" }
@@ -46,7 +49,14 @@ POST /v1/chat/completions
   "temperature": 0.7,                 // optional
   "tools": [...],                     // optional — function calling
   "tool_choice": "auto",              // optional
-  "response_format": { "type": "json_schema", "json_schema": {...} }  // optional
+  "response_format": { "type": "json_schema", "json_schema": {...} },  // optional
+  "prompt": "my-saved-prompt-name",   // optional — lookup จาก /v1/prompts
+  "extra": {                          // optional dev controls (หรือใช้ headers)
+    "prefer": ["groq", "cerebras"],
+    "exclude": ["mistral"],
+    "max_latency_ms": 3000,
+    "strategy": "fastest"             // "fastest" | "strongest"
+  }
 }
 ```
 
@@ -54,12 +64,13 @@ POST /v1/chat/completions
 
 | Model | พฤติกรรม |
 |-------|---------|
-| `auto` (default) | Smart routing — เลือก model ที่ดีที่สุดตาม request type |
-| `sml/auto` | เหมือน `auto` |
-| `sml/fast` | เลือก model เร็วสุด (cerebras, groq) |
-| `sml/tools` | เลือก model ที่รองรับ function calling + context ใหญ่ |
-| `sml/thai` | เลือก model ที่ถนัดภาษาไทย |
-| `provider/model_id` | ระบุตรง เช่น `mistral/mistral-large-latest` |
+| `sml/auto` (แนะนำ) | Smart routing — เลือก model ตาม category (thai/code/tools/vision/...) |
+| `sml/fast` | เลือก model latency ต่ำสุด |
+| `sml/tools` | เลือก model ที่รองรับ function calling |
+| `sml/thai` | เลือก model ครูหัวหน้าหมวด thai |
+| `sml/consensus` | ยิง 3 model ขนานกัน → เลือกคำตอบที่ตรงกันมากสุด |
+| `provider/model_id` | ระบุตรง เช่น `groq/moonshotai/kimi-k2-instruct-0905` |
+| `auto` | alias ของ `sml/auto` (backward-compat) |
 
 #### Vision (ส่งรูป)
 
@@ -479,7 +490,7 @@ App ไม่ต้องกังวลเรื่องพวกนี้ —
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://<your-server>:3333/v1",
+    base_url="http://localhost:3334/v1",
     api_key="any-string"
 )
 
@@ -547,7 +558,7 @@ response = client.images.generate(
 
 ```bash
 # Chat
-curl http://<server>:3333/v1/chat/completions \
+curl http://localhost:3334/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
@@ -556,7 +567,7 @@ curl http://<server>:3333/v1/chat/completions \
   }'
 
 # Streaming
-curl http://<server>:3333/v1/chat/completions \
+curl http://localhost:3334/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
@@ -565,13 +576,13 @@ curl http://<server>:3333/v1/chat/completions \
   }'
 
 # Models list
-curl http://<server>:3333/v1/models
+curl http://localhost:3334/v1/models
 ```
 
 ### TypeScript/JavaScript
 
 ```typescript
-const response = await fetch("http://<server>:3333/v1/chat/completions", {
+const response = await fetch("http://localhost:3334/v1/chat/completions", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
@@ -639,7 +650,7 @@ while (true) {
 
 ## Quick Start
 
-1. ตั้ง `base_url` เป็น `http://<server>:3333/v1`
+1. ตั้ง `base_url` เป็น `http://localhost:3334/v1`
 2. ตั้ง `api_key` เป็นอะไรก็ได้
 3. ใช้ `model: "auto"` (หรือไม่ส่งก็ได้)
 4. ส่ง request ตาม OpenAI format ปกติ — proxy จัดการ routing, retry, normalization ให้ทั้งหมด
