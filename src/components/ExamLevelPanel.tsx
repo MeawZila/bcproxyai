@@ -72,28 +72,29 @@ export function ExamLevelPanel() {
     });
   }, [fetchConfig]);
 
-  const onSelectPreview = async (lv: ExamLevel) => {
+  // คลิกการ์ดระดับ → save ทันที (ไม่ต้องกดปุ่มบันทึกอีก)
+  const onSelectAndSave = async (lv: ExamLevel) => {
+    if (saving) return;
     setPreviewLevel(lv);
     setShowAll(false);
-    await fetchConfig(lv);
-  };
-
-  const onSave = async () => {
-    if (!previewLevel) return;
     setSaving(true);
     setStatusMsg(null);
     try {
       const res = await fetch("/api/exam-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level: previewLevel }),
+        body: JSON.stringify({ level: lv }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
-      setStatusMsg({ kind: "ok", text: `บันทึกระดับ ${previewLevel} แล้ว — model ใหม่ที่เข้ามาจะสอบในระดับนี้` });
-      await fetchConfig(previewLevel);
+      const meta = data?.levels.find((x) => x.id === lv);
+      setStatusMsg({
+        kind: "ok",
+        text: `✓ ตั้งค่าเป็น ${meta?.emoji ?? ""} ${meta?.label ?? lv} แล้ว — สอบรอบหน้าใช้ ${meta?.questionCount ?? "?"} ข้อ ผ่าน ≥ ${meta?.threshold ?? "?"}%`,
+      });
+      await fetchConfig(lv);
     } catch (err) {
       setStatusMsg({ kind: "err", text: `บันทึกล้มเหลว: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
@@ -137,7 +138,6 @@ export function ExamLevelPanel() {
 
   const active = data.active;
   const selected = previewLevel ?? active;
-  const dirty = selected !== active;
   const questions = data.questions ?? [];
   const visibleQs = showAll ? questions : questions.slice(0, 5);
 
@@ -162,28 +162,36 @@ export function ExamLevelPanel() {
         </div>
       </div>
 
-      {/* Level selector — 4 cards */}
+      {/* Level selector — 4 cards (คลิกแล้ว save ทันที) */}
       <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-2">
         {data.levels.map((lv) => {
-          const isSelected = selected === lv.id;
           const isActive = active === lv.id;
+          const isPreview = selected === lv.id && !isActive;
           return (
             <button
               key={lv.id}
-              onClick={() => onSelectPreview(lv.id)}
-              className={`relative text-left p-3 rounded-lg border-2 transition-all ${
-                isSelected
-                  ? `${LEVEL_BORDER[lv.id]} shadow-lg`
+              onClick={() => onSelectAndSave(lv.id)}
+              disabled={saving}
+              className={`relative text-left p-3 rounded-lg border-2 transition-all disabled:opacity-60 disabled:cursor-wait ${
+                isActive
+                  ? `${LEVEL_BORDER[lv.id]} shadow-lg ring-2 ring-emerald-500/40`
+                  : isPreview
+                  ? `${LEVEL_BORDER[lv.id]}`
                   : "border-white/5 bg-white/2 hover:bg-white/5"
               }`}
             >
               {isActive && (
-                <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  ใช้งาน
+                <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 font-bold">
+                  ✓ ใช้งานอยู่
+                </span>
+              )}
+              {saving && selected === lv.id && (
+                <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200">
+                  กำลังบันทึก…
                 </span>
               )}
               <div className="text-2xl mb-1">{lv.emoji}</div>
-              <div className={`font-bold text-sm ${isSelected ? LEVEL_TEXT[lv.id] : "text-white"}`}>
+              <div className={`font-bold text-sm ${isActive ? LEVEL_TEXT[lv.id] : "text-white"}`}>
                 {lv.label}
               </div>
               <div className="text-[11px] text-gray-500 mt-1">
@@ -195,16 +203,10 @@ export function ExamLevelPanel() {
         })}
       </div>
 
-      {/* Action bar */}
+      {/* Action bar — เลือกระดับ save อัตโนมัติแล้ว เหลือแค่ปุ่ม Reset */}
       <div className="px-4 py-3 border-t border-white/5 bg-black/20 flex items-center gap-2 flex-wrap">
-        <button
-          onClick={onSave}
-          disabled={saving || !dirty}
-          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          title={dirty ? "บันทึกระดับใหม่" : "ระดับนี้กำลังใช้งานอยู่แล้ว"}
-        >
-          {saving ? "กำลังบันทึก…" : dirty ? `บันทึก: ${selected}` : "ระดับนี้ใช้อยู่แล้ว"}
-        </button>
+        <span className="text-xs text-gray-500 italic">💡 คลิกการ์ดระดับ → บันทึกอัตโนมัติทันที</span>
+        <span className="flex-1" />
         <button
           onClick={onResetAll}
           disabled={resetting}
