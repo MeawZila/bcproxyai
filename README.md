@@ -7,6 +7,8 @@
 
 **Local-only** — ออกแบบให้รันบน Docker Desktop เครื่องเดียว ไม่มี auth / multi-tenant / public deploy (หลีกเลี่ยงปัญหา provider IP lock)
 
+**Stateless** — gateway ไม่เก็บ conversation history / session memory. Client (OpenClaw, Aider, IDE plugin, ฯลฯ) เป็นคนจัดการ history เอง แล้วส่ง `messages[]` array มาทุก request ตามมาตรฐาน OpenAI API. ระบบมีแค่ `semantic_cache` (cache response ตาม embedding similarity) + routing memory (`live_score`, `fail_streak`, category winners) ซึ่งเป็น aggregate stat ไม่ผูกกับ user.
+
 ## สิ่งที่ Dev ได้ทันที
 
 | | |
