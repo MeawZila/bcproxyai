@@ -241,7 +241,7 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Setup
+                ตั้งค่า
               </a>
               <a
                 href="/guide"
@@ -282,7 +282,7 @@ export default function Dashboard() {
               { id: "cache",         icon: "\u{1F9E0}", label: "แคช" },
               { id: "warmup",        icon: "\u{1F525}", label: "อุ่นเครื่อง" },
               { id: "providers",     icon: "\u{1F50C}", label: "ผู้ให้บริการ" },
-              { id: "provider-catalog", icon: "\u{1F310}", label: "Catalog" },
+              { id: "provider-catalog", icon: "\u{1F310}", label: "บัญชีรายชื่อ" },
               { id: "rankings",      icon: "\u{1F3C6}", label: "ผลงาน" },
               { id: "speed-race",    icon: "\u{1F3C1}", label: "วิ่งแข่ง" },
               { id: "analytics",     icon: "\u{1F4CA}", label: "สมุดพก" },
@@ -353,18 +353,18 @@ export default function Dashboard() {
           <div className="glass rounded-xl border border-indigo-500/20 p-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">🛠</span>
-              <span className="font-bold text-white text-lg">เครื่องมือ Dev</span>
+              <span className="font-bold text-white text-lg">เครื่องมือสำหรับนักพัฒนา</span>
               <a href="/guide#dev-tools" target="_blank" rel="noopener noreferrer" className="ml-auto text-xs text-indigo-300 hover:text-white">คู่มือเต็ม →</a>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5">
               {[
-                { path: "/v1/models/search", label: "Search Model", icon: "🔍" },
-                { path: "/v1/compare", label: "Compare (≤10)", icon: "⚖️" },
-                { path: "/v1/structured", label: "JSON Schema", icon: "📐" },
-                { path: "/v1/trace/:id", label: "Trace Request", icon: "🔬" },
-                { path: "/api/my-stats", label: "My Stats", icon: "📊" },
-                { path: "/v1/prompts", label: "Prompt Library", icon: "📚" },
-                { path: "/api/metrics", label: "Prometheus", icon: "📈" },
+                { path: "/v1/models/search", label: "ค้นหา Model", icon: "🔍" },
+                { path: "/v1/compare", label: "เปรียบเทียบ (≤10)", icon: "⚖️" },
+                { path: "/v1/structured", label: "ผลลัพธ์ JSON", icon: "📐" },
+                { path: "/v1/trace/:id", label: "ติดตามคำขอ", icon: "🔬" },
+                { path: "/api/my-stats", label: "สถิติของฉัน", icon: "📊" },
+                { path: "/v1/prompts", label: "คลัง Prompt", icon: "📚" },
+                { path: "/api/metrics", label: "ตัวชี้วัด Prometheus", icon: "📈" },
               ].map((ep) => (
                 <code key={ep.path} className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-gray-900/50 border border-white/5 text-xs">
                   <span>{ep.icon}</span>
@@ -373,7 +373,7 @@ export default function Dashboard() {
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Control headers: <code className="text-amber-300">X-SMLGateway-Prefer</code> · <code className="text-amber-300">Exclude</code> · <code className="text-amber-300">Strategy: fastest|strongest</code> · <code className="text-amber-300">Max-Latency</code>
+              เฮดเดอร์ควบคุม: <code className="text-amber-300">X-SMLGateway-Prefer</code> (เลือก) · <code className="text-amber-300">Exclude</code> (ตัดทิ้ง) · <code className="text-amber-300">Strategy: fastest|strongest</code> (กลยุทธ์) · <code className="text-amber-300">Max-Latency</code> (เวลาตอบสูงสุด)
             </p>
           </div>
         </section>
@@ -650,8 +650,8 @@ export default function Dashboard() {
         <section id="provider-catalog" className="animate-fade-in-up stagger-1">
           <div className="flex items-center gap-3 mb-3">
             <span className="text-2xl">🌐</span>
-            <span className="font-bold text-white text-2xl">Catalog Provider</span>
-            <span className="text-xs text-gray-400 ml-1">ระบบค้นหา provider ใหม่จาก internet อัตโนมัติ</span>
+            <span className="font-bold text-white text-2xl">บัญชีรายชื่อผู้ให้บริการ</span>
+            <span className="text-xs text-gray-400 ml-1">ระบบค้นหาผู้ให้บริการใหม่จากอินเทอร์เน็ตอัตโนมัติ</span>
           </div>
           <ProviderCatalogPanel />
         </section>

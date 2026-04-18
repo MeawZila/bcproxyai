@@ -30,10 +30,10 @@ interface CatalogResponse {
 }
 
 const STATUS_STYLE: Record<CatalogProvider["status"], { label: string; cls: string }> = {
-  active:  { label: "✓ ใช้งาน",     cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
-  pending: { label: "⌛ รอ wire",   cls: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-  failed:  { label: "✗ พังแล้ว",   cls: "bg-red-500/20 text-red-300 border-red-500/30" },
-  paused:  { label: "⏸ หยุด",      cls: "bg-gray-500/20 text-gray-300 border-gray-500/30" },
+  active:  { label: "✓ ใช้งานได้",  cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  pending: { label: "⌛ รอเชื่อม",   cls: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  failed:  { label: "✗ ใช้ไม่ได้",  cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+  paused:  { label: "⏸ ปิดอยู่",    cls: "bg-gray-500/20 text-gray-300 border-gray-500/30" },
 };
 
 const SOURCE_EMOJI: Record<string, string> = {
@@ -42,6 +42,14 @@ const SOURCE_EMOJI: Record<string, string> = {
   huggingface: "🤗",
   pattern:     "🔍",
   manual:      "✋",
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  seed:        "ในตัวระบบ",
+  openrouter:  "จาก OpenRouter",
+  huggingface: "จาก HuggingFace",
+  pattern:     "สแกน URL",
+  manual:      "เพิ่มเอง",
 };
 
 export function ProviderCatalogPanel() {
@@ -89,7 +97,7 @@ export function ProviderCatalogPanel() {
     return (
       <div className="glass rounded-xl p-4 border border-white/10">
         <div className="flex items-center gap-2 text-gray-500 text-sm">
-          <span className="animate-pulse">⏳</span> กำลังโหลด catalog…
+          <span className="animate-pulse">⏳</span> กำลังโหลดรายการ…
         </div>
       </div>
     );
@@ -107,29 +115,29 @@ export function ProviderCatalogPanel() {
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-2xl">🌐</span>
           <div className="flex-1 min-w-[200px]">
-            <div className="font-bold text-white text-lg">Provider Catalog (Auto-Discovery)</div>
+            <div className="font-bold text-white text-lg">รายชื่อผู้ให้บริการ (ค้นหาอัตโนมัติ)</div>
             <div className="text-xs text-gray-400">
-              ระบบหา provider ใหม่จากอินเทอร์เน็ตอัตโนมัติทุก worker cycle (15 นาที)
+              ระบบค้นหาผู้ให้บริการใหม่จากอินเทอร์เน็ตอัตโนมัติทุกๆ 15 นาที
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
-              ✓ {data.summary.active} active
+              ✓ ใช้งานได้ {data.summary.active}
             </span>
             <span className="px-2 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20">
-              ⌛ {data.summary.pending} pending
+              ⌛ รอเชื่อม {data.summary.pending}
             </span>
             <span className="px-2 py-1 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/20">
-              🆓 {data.summary.free_tier} free
+              🆓 ฟรี {data.summary.free_tier}
             </span>
             <span className="text-gray-500">รวม {data.summary.total}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-500 flex-wrap">
-          <span>แหล่ง:</span>
+          <span>แหล่งข้อมูล:</span>
           {Object.entries(data.summary.sources).map(([src, count]) => (
             <span key={src} className="px-1.5 py-0.5 rounded bg-white/5">
-              {SOURCE_EMOJI[src] ?? "?"} {src} ({count})
+              {SOURCE_EMOJI[src] ?? "?"} {SOURCE_LABEL[src] ?? src} ({count})
             </span>
           ))}
         </div>
@@ -141,9 +149,9 @@ export function ProviderCatalogPanel() {
           onClick={onDiscover}
           disabled={discovering}
           className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          title="สแกน internet หา provider ใหม่ทันที (ไม่รอ worker cycle)"
+          title="ค้นหาผู้ให้บริการใหม่จากอินเทอร์เน็ตทันที (ไม่ต้องรอรอบถัดไป)"
         >
-          {discovering ? "🔎 กำลังค้นหา…" : "🔎 ค้นหา provider ใหม่จาก internet"}
+          {discovering ? "🔎 กำลังค้นหา…" : "🔎 ค้นหาผู้ให้บริการใหม่"}
         </button>
         <div className="flex items-center gap-1 ml-auto">
           {(["all", "active", "pending"] as const).map((f) => (
@@ -156,7 +164,7 @@ export function ProviderCatalogPanel() {
                   : "text-gray-500 hover:text-white"
               }`}
             >
-              {f === "all" ? "ทั้งหมด" : f === "active" ? "ใช้งาน" : "รอ wire"}
+              {f === "all" ? "ทั้งหมด" : f === "active" ? "ใช้งานได้" : "รอเชื่อม"}
             </button>
           ))}
         </div>
@@ -197,11 +205,11 @@ export function ProviderCatalogPanel() {
                   {p.base_url}
                 </div>
                 {p.env_var && (
-                  <div className="text-[10px] text-gray-600 mt-0.5 font-mono">env: {p.env_var}</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5 font-mono">ตัวแปร: {p.env_var}</div>
                 )}
                 {p.notes && <div className="text-[11px] text-gray-400 mt-1 line-clamp-2">{p.notes}</div>}
                 <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-600">
-                  <span>source: {p.source}</span>
+                  <span>แหล่ง: {SOURCE_LABEL[p.source] ?? p.source}</span>
                   {p.homepage && (
                     <a
                       href={p.homepage}
@@ -209,7 +217,7 @@ export function ProviderCatalogPanel() {
                       rel="noopener noreferrer"
                       className="ml-auto text-indigo-300 hover:text-white"
                     >
-                      เว็บ →
+                      เปิดเว็บ →
                     </a>
                   )}
                 </div>
@@ -217,7 +225,7 @@ export function ProviderCatalogPanel() {
             );
           })}
           {filtered.length === 0 && (
-            <div className="text-xs text-gray-500 italic col-span-full">ไม่มี provider ในกลุ่มนี้</div>
+            <div className="text-xs text-gray-500 italic col-span-full">ไม่มีผู้ให้บริการในกลุ่มนี้</div>
           )}
         </div>
       </div>
