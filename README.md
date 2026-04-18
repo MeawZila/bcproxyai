@@ -11,14 +11,14 @@
 
 **DB-driven config** — Provider list และ API keys อยู่ใน database ทั้งหมด (`provider_catalog` + `api_keys` table). `.env.local` ใช้แค่ runtime config (Ollama URL, Cloudflare account ID) — **ไม่อ่าน API key จาก env**. ตั้งค่าทุกอย่างผ่าน Setup modal ในหน้า dashboard.
 
-**Auto-Discovery** — ทุก worker cycle (15 นาที) ระบบสแกน internet หา provider ใหม่จาก 3 แหล่ง: (1) OpenRouter `/api/v1/providers`, (2) HuggingFace inference list, (3) URL pattern probe (Anthropic, OpenAI, Perplexity, Anyscale, Lepton, OctoAI, Volcano Ark, Writer, Voyage, Lambda Labs, RunPod). Provider ที่พบใหม่ → INSERT `provider_catalog` ด้วย `status='active'` ทันที — ใช้งานได้เลยจาก Setup modal (ไม่ต้องรอ Dev wire เข้า code).
+**Auto-Discovery (free-only)** — ทุก worker cycle (15 นาที) ระบบสแกน internet หา provider ใหม่จาก 3 แหล่ง: (1) OpenRouter `/api/v1/providers`, (2) HuggingFace inference list, (3) URL pattern probe. Provider ที่พบใหม่ → INSERT `provider_catalog` ด้วย `status='active'` ทันที — ใช้งานได้เลยจาก Setup. **กรอง paid-only providers ทิ้ง** (Anthropic, OpenAI, DeepSeek, xAI, Moonshot, Perplexity, ฯลฯ) ผ่าน `PAID_ONLY` whitelist ใน [provider-discovery.ts](src/lib/worker/provider-discovery.ts) — เก็บเฉพาะ provider ที่มี free tier / free credit จริง.
 
 ## สิ่งที่ Dev ได้ทันที
 
 | | |
 |---|---|
-| 🆓 Free | 30+ providers ฟรี, 300+ models, ไม่มี token cost |
-| 🌐 Auto-Discovery | สแกน OpenRouter/HuggingFace/URL pattern หา provider ใหม่ทุก 15 นาที |
+| 🆓 Free-only | 31 providers (free tier เท่านั้น — paid ถูกกรองออก), 300+ models |
+| 🌐 Auto-Discovery | สแกน OpenRouter/HuggingFace/URL pattern หา provider ใหม่ทุก 15 นาที (กรอง paid ทิ้ง) |
 | ⚡ Fast | hedge top-3, warmup, semantic cache → p50 ~500ms |
 | 🎯 Smart routing | per-category teacher (thai/code/tools/vision/...) |
 | 🔄 Auto-fallback | provider ล่ม → สลับทันที, circuit breaker + cooldown |
@@ -113,7 +113,7 @@ Trigger manual: `curl -X POST http://localhost:3334/api/worker`
 | `models` | รายการโมเดล + flags (vision, tools, thai, ...) + live_score |
 | `teachers` | ครูใหญ่ + ครูหัวหน้าต่อ category + ครูคุมสอบ (rebuild ทุก cycle) |
 | `model_category_scores` | คะแนนรายโมเดลต่อ 12 หมวด (code, thai, tools, vision, ...) |
-| `exam_attempts` / `exam_answers` | ผลสอบ + คอลัมน์ `exam_level` (primary/middle/high/university) |
+| `exam_attempts` / `exam_answers` | ผลสอบ + คอลัมน์ `exam_level` (middle/high/university) |
 | `worker_state` | key-value config (เช่น `exam_level` ที่ใช้สอบรอบถัดไป) |
 | `provider_catalog` | registry ของ provider ที่ระบบรู้จัก (seed + auto-discovered จาก OpenRouter/HF/pattern) |
 | `gateway_logs` | log ทุก request (model, provider, latency, status) |
@@ -147,19 +147,21 @@ Trigger manual: `curl -X POST http://localhost:3334/api/worker`
 - **ครูหัวหน้าหมวด (head)** — 1 ตัวต่อ category (12 หมวด: code, thai, tools, vision, math, reasoning, extraction, classification, comprehension, instruction, json, safety)
 - **ครูคุมสอบ (proctor)** — ≤ 10 ตัว, ใช้ออกและเกรดข้อสอบ
 
-### Exam — 4 ระดับความยาก (cumulative)
+### Exam — 3 ระดับความยาก (cumulative)
 
 | ระดับ | ชื่อ | จำนวนข้อ | ผ่าน |
 |------|------|---------|------|
-| 🟢 `primary`    | ประถม      | 10 | ≥ 70% |
-| 🟡 `middle`     | มัธยมต้น   | 19 | ≥ 75% |
-| 🟠 `high`       | มัธยมปลาย  | 27 | ≥ 80% |
-| 🔴 `university` | มหาลัย     | 35 | ≥ 85% |
+| 🟡 `middle`     | มัธยมต้น   | 9 | ≥ 75% — _default_ |
+| 🟠 `high`       | มัธยมปลาย  | 17 | ≥ 80% |
+| 🔴 `university` | มหาลัย     | 25 | ≥ 85% |
 
-ระดับสูงครอบคลุมข้อของระดับต่ำกว่า (เด็กมหาลัยต้องตอบข้อประถมได้) — score normalize เป็น % เพื่อเทียบข้ามระดับได้
+ระดับสูงครอบคลุมข้อของระดับต่ำกว่า — score normalize เป็น % เพื่อเทียบข้ามระดับได้
+**Default = middle** เพราะระดับต่ำกว่า (เช่น math พื้นฐาน) ไม่กรอง language model ออก → routing เลือก Arabic model ตอบ Thai
 
-ตั้งค่าระดับ: dashboard section **🎚 ระดับสอบ** — คลิกการ์ดระดับ → save อัตโนมัติทันที (ไม่มีปุ่มยืนยัน) หรือ `POST /api/exam-config { "level": "primary" }`
+ตั้งค่าระดับ: dashboard section **🎚 ระดับสอบ** — คลิกการ์ดระดับ → save อัตโนมัติทันที หรือ `POST /api/exam-config { "level": "middle" }`
 สอบใหม่ทุกคน: ปุ่ม **🔄 สอบใหม่ทุกคน** (กด 2 ครั้งเพื่อยืนยัน) หรือ `POST /api/exam-reset` — ลบ `exam_attempts` + `model_category_scores` ทั้งหมด แล้ว trigger worker
+
+**ใส่ key ใหม่ → re-exam อัตโนมัติ**: `/api/setup` POST → trigger `triggerExamForProvider(provider)` ทันที (model ที่เคยตกของ provider นั้น สอบใหม่ในรอบถัดไป) — กัน infinite loop ด้วย 5-min cooldown guard.
 
 **Appoint:** หลัง exam ทุก cycle → `DELETE FROM teachers` + bulk insert (atomic swap)
 **Routing:** `sml/auto` + category prompt → route ไปครูหัวหน้าของหมวดนั้นก่อน
@@ -208,8 +210,8 @@ Trigger manual: `curl -X POST http://localhost:3334/api/worker`
 | `GET  /api/warmup-stats` | warmup cycle stats |
 | `GET  /api/metrics` | Prometheus text format |
 | `POST /api/worker` | trigger scan+exam cycle ด้วยมือ |
-| `GET  /api/exam-config` | active exam level + 4 ระดับ + ตัวอย่างข้อสอบ (`?includeQuestions=1&level=primary`) |
-| `POST /api/exam-config` | ตั้งระดับสอบ `{ "level": "primary"\|"middle"\|"high"\|"university" }` |
+| `GET  /api/exam-config` | active exam level + 3 ระดับ + ตัวอย่างข้อสอบ (`?includeQuestions=1&level=middle`) |
+| `POST /api/exam-config` | ตั้งระดับสอบ `{ "level": "middle"\|"high"\|"university" }` |
 | `POST /api/exam-reset` | ลบประวัติสอบทั้งหมด + trigger worker ให้สอบใหม่ทันที |
 | `GET  /api/provider-catalog` | รายการ provider ทั้งหมด (seed + discovered) + summary ตาม source |
 | `POST /api/provider-catalog` | trigger auto-discovery ทันที (สแกน OpenRouter, HF, URL pattern) |
