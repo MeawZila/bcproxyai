@@ -16,6 +16,7 @@ const NO_KEY_REQUIRED = new Set(["ollama", "pollinations"]);
 const keyIndexMap = new Map<string, number>();
 const cooldownMap = new Map<string, number>(); // "provider:key" -> cooldown until timestamp
 
+// (paid-only providers removed: deepseek, xai, moonshot)
 // Cache DB keys for 30s to avoid hitting DB on every request
 let dbKeysCache: Record<string, string> = {};
 let dbKeysCacheTime = 0;

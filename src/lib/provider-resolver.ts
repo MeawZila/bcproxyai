@@ -36,9 +36,9 @@ const HARDCODED_ENV_MAP: Record<string, string> = {
   ollamacloud: "OLLAMA_CLOUD_API_KEY", siliconflow: "SILICONFLOW_API_KEY", glhf: "GLHF_API_KEY",
   together: "TOGETHER_API_KEY", hyperbolic: "HYPERBOLIC_API_KEY", zai: "ZAI_API_KEY",
   dashscope: "DASHSCOPE_API_KEY", reka: "REKA_API_KEY",
-  deepseek: "DEEPSEEK_API_KEY", deepinfra: "DEEPINFRA_API_KEY", novita: "NOVITA_API_KEY",
-  monsterapi: "MONSTERAPI_API_KEY", friendli: "FRIENDLI_API_KEY", xai: "XAI_API_KEY",
-  moonshot: "MOONSHOT_API_KEY", ai21: "AI21_API_KEY",
+  deepinfra: "DEEPINFRA_API_KEY", novita: "NOVITA_API_KEY",
+  monsterapi: "MONSTERAPI_API_KEY", friendli: "FRIENDLI_API_KEY",
+  ai21: "AI21_API_KEY",
 };
 
 async function refresh(): Promise<void> {

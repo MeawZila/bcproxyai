@@ -66,14 +66,11 @@ const SEED_NOTES: Record<string, { homepage?: string; freeTier?: boolean; notes?
   hyperbolic:   { homepage: "https://hyperbolic.xyz", freeTier: true },
   zai:          { homepage: "https://z.ai", freeTier: true },
   dashscope:    { homepage: "https://dashscope-intl.aliyuncs.com", freeTier: true, notes: "Qwen — Alibaba" },
-  reka:         { homepage: "https://reka.ai", freeTier: false },
-  deepseek:     { homepage: "https://platform.deepseek.com", freeTier: false, notes: "Cheap, paid" },
+  reka:         { homepage: "https://reka.ai", freeTier: true, notes: "$10 free auto-refresh /month" },
   deepinfra:    { homepage: "https://deepinfra.com", freeTier: true, notes: "Free credit" },
   novita:       { homepage: "https://novita.ai", freeTier: true, notes: "Free credit" },
   monsterapi:   { homepage: "https://monsterapi.ai", freeTier: true },
   friendli:     { homepage: "https://friendli.ai", freeTier: true, notes: "1M tokens free" },
-  xai:          { homepage: "https://console.x.ai", freeTier: false, notes: "Grok — paid" },
-  moonshot:     { homepage: "https://platform.moonshot.ai", freeTier: false, notes: "Kimi — paid" },
   ai21:         { homepage: "https://studio.ai21.com", freeTier: true, notes: "Free trial" },
 };
 
@@ -87,9 +84,9 @@ const ENV_BY_PROVIDER: Record<string, string> = {
   ollamacloud: "OLLAMA_CLOUD_API_KEY", siliconflow: "SILICONFLOW_API_KEY", glhf: "GLHF_API_KEY",
   together: "TOGETHER_API_KEY", hyperbolic: "HYPERBOLIC_API_KEY", zai: "ZAI_API_KEY",
   dashscope: "DASHSCOPE_API_KEY", reka: "REKA_API_KEY",
-  deepseek: "DEEPSEEK_API_KEY", deepinfra: "DEEPINFRA_API_KEY", novita: "NOVITA_API_KEY",
-  monsterapi: "MONSTERAPI_API_KEY", friendli: "FRIENDLI_API_KEY", xai: "XAI_API_KEY",
-  moonshot: "MOONSHOT_API_KEY", ai21: "AI21_API_KEY",
+  deepinfra: "DEEPINFRA_API_KEY", novita: "NOVITA_API_KEY",
+  monsterapi: "MONSTERAPI_API_KEY", friendli: "FRIENDLI_API_KEY",
+  ai21: "AI21_API_KEY",
 };
 
 export async function seedProviderCatalog(): Promise<void> {
@@ -122,6 +119,25 @@ interface Discovery {
   source: "openrouter" | "huggingface" | "pattern";
   notes?: string;
 }
+
+// Provider ที่รู้ว่า paid-only (ไม่มี free tier) — discovery จะไม่ insert
+// Note: บาง provider มาจากหลาย discovery source แต่ก็เป็นเจ้าเดียวกัน
+const PAID_ONLY = new Set([
+  "anthropic", "openai", "perplexity", "googlevertex", "azure",
+  "amazonbedrock", "amazonnova", "googleaistudio",
+  "deepseek", "xai", "moonshot", "moonshotai",
+  "voyage", "writer", "lambdalabs", "runpod", "lepton", "octoai",
+  "minimax", "stepfun", "venice", "recraft", "blackforestlabs",
+  "morph", "relace", "modelrun", "nextbit", "modular", "inception",
+  "inceptron", "infermatic", "inflection", "ionet", "ionstream",
+  "liquid", "mancer", "mara", "ncompass", "nebius", "openinference",
+  "parasail", "phala", "seed", "sourceful", "stealth", "streamlake",
+  "switchpoint", "upstage", "wandb", "xiaomi", "akashml", "aionlabs",
+  "alibaba", "ambient", "arceeai", "atlascloud", "avian", "baidu",
+  "baseten", "bytedance", "cirrascale", "clarifai", "crusoe",
+  "dekallm", "fakeprovider", "featherless", "gmicloud", "fal-ai",
+  "falai", "replicate",
+]);
 
 async function fetchOpenRouterProviders(): Promise<Discovery[]> {
   try {
@@ -276,6 +292,7 @@ export async function discoverProviders(): Promise<DiscoveryResult> {
 
   for (const d of all) {
     if (existing.has(d.name)) continue;
+    if (PAID_ONLY.has(d.name)) continue; // ข้าม provider ที่รู้ว่าไม่มี free tier
     existing.add(d.name); // ป้องกัน duplicate ใน rounds เดียวกัน
     newOnes.push(d);
 
