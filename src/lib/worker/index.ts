@@ -104,7 +104,7 @@ export async function runWorkerCycle(): Promise<void> {
 
   let scanResult = { found: 0, new: 0 };
   let healthResult = { checked: 0, available: 0, cooldown: 0 };
-  let examResult: { examined: number; passed: number; failed: number; level: string } = { examined: 0, passed: 0, failed: 0, level: "university" };
+  let examResult: { examined: number; passed: number; failed: number; level: string } = { examined: 0, passed: 0, failed: 0, level: "primary" };
 
   // Step 0: Provider auto-discovery — ค้นหา provider ใหม่จาก internet ก่อน scan models
   try {

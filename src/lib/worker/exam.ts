@@ -916,7 +916,7 @@ export async function getActiveExamLevel(): Promise<ExamLevel> {
     const v = rows[0]?.value;
     if (v && (EXAM_LEVELS as string[]).includes(v)) return v as ExamLevel;
   } catch { /* fall through */ }
-  return "university"; // default — เข้มที่สุดเหมือนเดิม
+  return "primary"; // default — เริ่มจากง่าย ให้ model ผ่านได้เยอะก่อน
 }
 
 export async function setActiveExamLevel(level: ExamLevel): Promise<void> {
