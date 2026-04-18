@@ -24,31 +24,30 @@ const REQUEST_TIMEOUT_MS = 20_000;
 
 // ─── Exam Levels (4 ระดับ — ง่าย → ยาก) ─────────────────────────────────────
 
-export type ExamLevel = "primary" | "middle" | "high" | "university";
+// "primary" ถูกถอดออก — ข้อง่ายเกินทำให้ filter language model ไม่ออก
+// (เช่น Arabic model ตอบ math ได้ → routing ผิดภาษา)
+export type ExamLevel = "middle" | "high" | "university";
 
-export const EXAM_LEVELS: ExamLevel[] = ["primary", "middle", "high", "university"];
+export const EXAM_LEVELS: ExamLevel[] = ["middle", "high", "university"];
 
 // เกณฑ์ผ่านแยกตามระดับ (ระดับยากผ่านยากขึ้น)
 const PASS_THRESHOLD_BY_LEVEL: Record<ExamLevel, number> = {
-  primary: 70,
   middle: 75,
   high: 80,
   university: 85,
 };
 
 export const EXAM_LEVEL_META: Record<ExamLevel, { label: string; emoji: string; threshold: number; description: string }> = {
-  primary:    { label: "ประถม",     emoji: "🟢", threshold: 70, description: "ข้อง่ายมาก — บวกลบคูณหารพื้นฐาน, ทำตามคำสั่ง 1 คำ" },
-  middle:     { label: "มัธยมต้น", emoji: "🟡", threshold: 75, description: "ข้อปานกลาง — JSON extraction, ความปลอดภัยพื้นฐาน, distraction" },
+  middle:     { label: "มัธยมต้น", emoji: "🟡", threshold: 75, description: "ข้อปานกลาง — JSON extraction, ความปลอดภัยพื้นฐาน, distraction, ภาษาไทยพื้นฐาน" },
   high:       { label: "มัธยมปลาย",emoji: "🟠", threshold: 80, description: "ข้อยากปานกลาง — logic, long context, extraction ซับซ้อน" },
   university: { label: "มหาลัย",   emoji: "🔴", threshold: 85, description: "ข้อยากมาก — tool call, vision, code, multi-step math" },
 };
 
-// ระดับที่ครอบคลุม (cumulative): มหาลัยสอบทุกข้อ, ประถมสอบเฉพาะข้อ primary
+// ระดับที่ครอบคลุม (cumulative): มหาลัยสอบทุกข้อ, มัธยมต้นสอบเฉพาะข้อ middle
 const LEVEL_INCLUDES: Record<ExamLevel, ExamLevel[]> = {
-  primary:    ["primary"],
-  middle:     ["primary", "middle"],
-  high:       ["primary", "middle", "high"],
-  university: ["primary", "middle", "high", "university"],
+  middle:     ["middle"],
+  high:       ["middle", "high"],
+  university: ["middle", "high", "university"],
 };
 
 export function getPassThreshold(level: ExamLevel): number {
@@ -758,148 +757,17 @@ What is the square root of 144?`,
   },
 ];
 
-// ─── Primary level (10 ข้อใหม่ — ง่ายมาก) ────────────────────────────────────
-
-const PRIMARY_QUESTIONS: ExamQuestion[] = [
-  {
-    id: "primary_add_v1",
-    category: "math",
-    difficulty: "primary",
-    question: "What is 2 + 2? Reply with ONLY the number.",
-    expected: "4",
-    check: (answer) => {
-      const clean = stripThink(answer).trim();
-      if (/\b4\b/.test(clean)) return { passed: true, reason: "correct: 4" };
-      return { passed: false, reason: `expected 4: "${clean.slice(0, 30)}"` };
-    },
-  },
-  {
-    id: "primary_sub_v1",
-    category: "math",
-    difficulty: "primary",
-    question: "What is 10 - 3? Reply with ONLY the number.",
-    expected: "7",
-    check: (answer) => {
-      const clean = stripThink(answer).trim();
-      if (/\b7\b/.test(clean)) return { passed: true, reason: "correct: 7" };
-      return { passed: false, reason: `expected 7: "${clean.slice(0, 30)}"` };
-    },
-  },
-  {
-    id: "primary_mul_v1",
-    category: "math",
-    difficulty: "primary",
-    question: "What is 3 × 4? Reply with ONLY the number.",
-    expected: "12",
-    check: (answer) => {
-      const clean = stripThink(answer).trim();
-      if (/\b12\b/.test(clean)) return { passed: true, reason: "correct: 12" };
-      return { passed: false, reason: `expected 12: "${clean.slice(0, 30)}"` };
-    },
-  },
-  {
-    id: "primary_div_v1",
-    category: "math",
-    difficulty: "primary",
-    question: "What is 10 ÷ 2? Reply with ONLY the number.",
-    expected: "5",
-    check: (answer) => {
-      const clean = stripThink(answer).trim();
-      if (/\b5\b/.test(clean)) return { passed: true, reason: "correct: 5" };
-      return { passed: false, reason: `expected 5: "${clean.slice(0, 30)}"` };
-    },
-  },
-  {
-    id: "primary_thai_hello_v1",
-    category: "thai",
-    difficulty: "primary",
-    question: "ตอบคำว่า สวัสดี อย่างเดียว ไม่ต้องใส่อะไรเพิ่ม",
-    expected: "สวัสดี",
-    check: (answer) => {
-      const clean = stripThink(answer).trim();
-      if (/สวัสดี/.test(clean)) return { passed: true, reason: "correct: สวัสดี" };
-      return { passed: false, reason: `expected สวัสดี: "${clean.slice(0, 40)}"` };
-    },
-  },
-  {
-    id: "primary_thai_color_v1",
-    category: "thai",
-    difficulty: "primary",
-    question: "สีของท้องฟ้าตอนกลางวันคือสีอะไร? ตอบ 1 คำ ภาษาไทย",
-    expected: "ฟ้า / น้ำเงิน",
-    check: (answer) => {
-      const clean = stripThink(answer);
-      if (/ฟ้า|น้ำเงิน|ครามม?|blue/i.test(clean)) return { passed: true, reason: "correct: blue" };
-      return { passed: false, reason: `expected สีฟ้า: "${clean.slice(0, 40)}"` };
-    },
-  },
-  {
-    id: "primary_count_v1",
-    category: "thai",
-    difficulty: "primary",
-    question: "นับเลข 1 ถึง 5 เป็นภาษาไทย คั่นด้วยเว้นวรรค ตอบสั้นๆ",
-    expected: "หนึ่ง สอง สาม สี่ ห้า",
-    check: (answer) => {
-      const clean = stripThink(answer);
-      const words = [/หนึ่ง|1/, /สอง|2/, /สาม|3/, /สี่|4/, /ห้า|5/];
-      const matched = words.filter(r => r.test(clean)).length;
-      if (matched >= 4) return { passed: true, reason: `correct: ${matched}/5 numbers` };
-      return { passed: false, reason: `only ${matched}/5: "${clean.slice(0, 50)}"` };
-    },
-  },
-  {
-    id: "primary_yes_v1",
-    category: "instruction",
-    difficulty: "primary",
-    question: 'Reply with the word "yes" and nothing else.',
-    expected: "yes",
-    check: (answer) => {
-      const clean = stripThink(answer).trim().toLowerCase().replace(/[.,!?"' ]/g, "");
-      if (clean === "yes" || clean === "ใช่") return { passed: true, reason: "exact yes" };
-      if (/^yes\b/i.test(stripThink(answer).trim())) return { passed: true, reason: "starts with yes" };
-      return { passed: false, reason: `expected "yes": "${answer.slice(0, 30)}"` };
-    },
-  },
-  {
-    id: "primary_capital_v1",
-    category: "thai",
-    difficulty: "primary",
-    question: "เมืองหลวงของประเทศไทยชื่ออะไร? ตอบสั้นๆ",
-    expected: "กรุงเทพ",
-    check: (answer) => {
-      const clean = stripThink(answer);
-      if (/กรุงเทพ|bangkok/i.test(clean)) return { passed: true, reason: "correct: กรุงเทพ" };
-      return { passed: false, reason: `expected กรุงเทพ: "${clean.slice(0, 40)}"` };
-    },
-  },
-  {
-    id: "primary_animal_v1",
-    category: "instruction",
-    difficulty: "primary",
-    question: 'แมวพูดว่าอะไร? ตอบ 1 คำ',
-    expected: "เมี้ยว / meow",
-    check: (answer) => {
-      const clean = stripThink(answer).toLowerCase();
-      if (/เมี้ยว|เหมียว|meow|miaow/i.test(clean)) return { passed: true, reason: "correct" };
-      return { passed: false, reason: `expected เมี้ยว: "${clean.slice(0, 40)}"` };
-    },
-  },
-];
-
 // ─── รวมข้อสอบทั้งหมด + tag difficulty ──────────────────────────────────────
 
-export const EXAM_QUESTIONS: ExamQuestion[] = [
-  ...RAW_EXAM_QUESTIONS.map((q) => ({
-    ...q,
-    difficulty: DIFFICULTY_BY_ID[q.id] ?? "university",
-  })),
-  ...PRIMARY_QUESTIONS,
-];
+export const EXAM_QUESTIONS: ExamQuestion[] = RAW_EXAM_QUESTIONS.map((q) => ({
+  ...q,
+  difficulty: DIFFICULTY_BY_ID[q.id] ?? "university",
+}));
 
 // ─── คัดข้อสอบตามระดับ (cumulative) ─────────────────────────────────────────
 
 export function getExamQuestions(level: ExamLevel): ExamQuestion[] {
-  const allowed = new Set<ExamLevel>(LEVEL_INCLUDES[level] ?? ["primary", "middle", "high", "university"]);
+  const allowed = new Set<ExamLevel>(LEVEL_INCLUDES[level] ?? ["middle", "high", "university"]);
   return EXAM_QUESTIONS.filter((q) => allowed.has(q.difficulty));
 }
 
@@ -916,7 +784,7 @@ export async function getActiveExamLevel(): Promise<ExamLevel> {
     const v = rows[0]?.value;
     if (v && (EXAM_LEVELS as string[]).includes(v)) return v as ExamLevel;
   } catch { /* fall through */ }
-  return "primary"; // default — เริ่มจากง่าย ให้ model ผ่านได้เยอะก่อน
+  return "middle"; // default — กรอง model ที่ภาษาไทย/JSON ทำไม่ได้ออก
 }
 
 export async function setActiveExamLevel(level: ExamLevel): Promise<void> {

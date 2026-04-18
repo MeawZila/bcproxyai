@@ -834,15 +834,14 @@ curl http://localhost:3334/v1/trace/5m3obi
             model เดียวสามารถเป็น head หลายหมวดได้ (คนเก่งหลายอย่าง)
           </P>
           <ul className="list-none space-y-1 text-sm text-gray-300">
-            <li>&#128994; <strong>ประถม (primary)</strong> — 10 ข้อ, ผ่าน &ge; 70%</li>
-            <li>&#128993; <strong>มัธยมต้น (middle)</strong> — 19 ข้อ, ผ่าน &ge; 75%</li>
-            <li>&#128992; <strong>มัธยมปลาย (high)</strong> — 27 ข้อ, ผ่าน &ge; 80%</li>
-            <li>&#128308; <strong>มหาลัย (university)</strong> — 35 ข้อ, ผ่าน &ge; 85%</li>
+            <li>&#128993; <strong>มัธยมต้น (middle)</strong> — 9 ข้อ, ผ่าน &ge; 75% <em className="text-gray-500">(default)</em></li>
+            <li>&#128992; <strong>มัธยมปลาย (high)</strong> — 17 ข้อ, ผ่าน &ge; 80%</li>
+            <li>&#128308; <strong>มหาลัย (university)</strong> — 25 ข้อ, ผ่าน &ge; 85%</li>
           </ul>
           <SubTitle>เปลี่ยนระดับ + สั่งสอบใหม่</SubTitle>
           <P>
             ตั้งค่าระดับใน dashboard section <strong>&#127962; ระดับสอบ</strong> (คลิกการ์ด → save อัตโนมัติ)
-            หรือ <InlineCode>POST /api/exam-config {`{ "level": "primary" }`}</InlineCode>.
+            หรือ <InlineCode>POST /api/exam-config {`{ "level": "middle" }`}</InlineCode>.
             สั่งสอบใหม่ทุกคน: ปุ่ม &ldquo;&#128260; สอบใหม่ทุกคน&rdquo; (กด 2 ครั้งยืนยัน) หรือ{" "}
             <InlineCode>POST /api/exam-reset</InlineCode> — ล้าง <InlineCode>exam_attempts</InlineCode> +
             <InlineCode>model_category_scores</InlineCode> แล้ว trigger worker ทันที
