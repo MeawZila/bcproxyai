@@ -44,7 +44,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     ports:
-      - "5439:5432"
+      - "5434:5432"
     environment:
       POSTGRES_USER: sml
       POSTGRES_PASSWORD: sml
@@ -74,7 +74,7 @@ services:
   redis:
     image: valkey/valkey:8-alpine
     ports:
-      - "6382:6379"
+      - "6388:6379"
     command:
       - valkey-server
       - --maxmemory
