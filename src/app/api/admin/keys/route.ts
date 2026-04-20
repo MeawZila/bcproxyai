@@ -2,26 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createKey, listKeys } from "@/lib/gateway-keys";
 import { auth } from "../../../../../auth";
 import { isOwnerEmail, hasOwners } from "@/lib/admin-emails";
+import { ADMIN_COOKIE_NAME, adminPasswordEnabled, verifyAdminCookie } from "@/lib/admin-cookie";
 
 export const dynamic = "force-dynamic";
 
-// Allow either:
-//   • Google OAuth session with an email in AUTH_OWNER_EMAIL, OR
-//   • Bearer GATEWAY_API_KEY (master) — for automation / CI
-//
-// Middleware is the primary gate; this is a belt-and-suspenders check so
-// the routes are safe when called server-to-server outside the middleware
-// matcher (e.g. route handlers).
+// Belt-and-suspenders check (middleware already gates /api/admin/*).
+// Accepts any of: master Bearer, signed admin cookie, Google owner session.
 async function whoami(req: NextRequest): Promise<{ ok: true; label: string } | { ok: false }> {
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   const master = (process.env.GATEWAY_API_KEY ?? "").trim();
   if (bearer && master && bearer === master) return { ok: true, label: "master" };
+  if (verifyAdminCookie(req.cookies.get(ADMIN_COOKIE_NAME)?.value)) return { ok: true, label: "password-cookie" };
   try {
     const session = (await auth()) as { user?: { email?: string | null } } | null;
     const email = session?.user?.email ?? "";
     if (email && isOwnerEmail(email)) return { ok: true, label: email };
   } catch { /* swallow — fall through to 401 */ }
-  if (!hasOwners() && !master) return { ok: true, label: "local" };
+  if (!hasOwners() && !master && !adminPasswordEnabled()) return { ok: true, label: "local" };
   return { ok: false };
 }
 
