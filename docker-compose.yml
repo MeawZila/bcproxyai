@@ -4,7 +4,7 @@ services:
     image: sml-gateway
     build: .
     expose:
-      - "3334"
+      - "3335"
     env_file:
       - .env.local
     environment:
