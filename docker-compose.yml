@@ -33,7 +33,7 @@ services:
   caddy:
     image: caddy:2-alpine
     ports:
-      - "3339:80"
+      - "3334:80"
     volumes:
       - ./caddy-docker.Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
@@ -44,7 +44,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     ports:
-      - "5434:5432"
+      - "5439:5432"
     environment:
       POSTGRES_USER: sml
       POSTGRES_PASSWORD: sml
