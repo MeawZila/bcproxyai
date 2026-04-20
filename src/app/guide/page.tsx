@@ -580,29 +580,89 @@ docker volume rm sml-gateway_sml-gateway-data
 docker compose up -d --build`}</Code>
         </Section>
 
-        <Section id="auth" icon="&#128274;" title="การยืนยันตัวตน (Bearer key only)">
+        <Section id="auth" icon="&#128274;" title="การยืนยันตัวตน — 3 แบบเลือกใช้">
           <P>
-            <strong>ไม่มีระบบ login, ไม่มี Google OAuth</strong> — ใช้แค่ Bearer API key อย่างเดียว.
-            หน้า UI (dashboard, setup, guide) เปิดให้ทุกคนเข้าดูได้.
-            เฉพาะ endpoint ที่ใช้ quota (<InlineCode>/v1/*</InlineCode>) และ admin (<InlineCode>/api/admin/*</InlineCode>) ที่ต้องใช้ key
+            ระบบรองรับ 3 วิธี login admin. <strong>Auto-detect จาก <InlineCode>.env</InlineCode></strong> —
+            ตั้ง env ของ method ไหน = method นั้นเปิด. ไม่มี <InlineCode>AUTH_MODE</InlineCode> flag.
           </P>
 
-          <SubTitle>ตั้งค่า Server mode — 2 ตัว</SubTitle>
-          <Code>{`# .env.local (หรือ .env.production บน droplet)
+          <SubTitle>3 แบบ</SubTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-gray-400 text-xs uppercase">
+                  <th className="text-left py-2 pr-4">แบบ</th>
+                  <th className="text-left py-2 pr-4">Trigger env</th>
+                  <th className="text-left py-2 pr-4">เหมาะกับ</th>
+                  <th className="text-left py-2">Session</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs">
+                <tr>
+                  <td className="py-2 pr-4"><span className="text-blue-400 font-bold">①</span> Google OAuth</td>
+                  <td className="py-2 pr-4 font-mono text-[11px]">GOOGLE_CLIENT_ID<br/>+ GOOGLE_CLIENT_SECRET<br/>+ NEXTAUTH_SECRET<br/>+ NEXTAUTH_URL</td>
+                  <td className="py-2 pr-4">ทีมที่มี Gmail, audit per-email</td>
+                  <td className="py-2">JWT 30 วัน</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4"><span className="text-amber-400 font-bold">②</span> Admin Password</td>
+                  <td className="py-2 pr-4 font-mono text-[11px]">ADMIN_PASSWORD</td>
+                  <td className="py-2 pr-4">ไม่มี Gmail / airgap / break-glass</td>
+                  <td className="py-2">HMAC cookie 7 วัน</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4"><span className="text-gray-400 font-bold">③</span> Bearer Key</td>
+                  <td className="py-2 pr-4 font-mono text-[11px]">GATEWAY_API_KEY</td>
+                  <td className="py-2 pr-4">CI / SDK / curl / automation</td>
+                  <td className="py-2">stateless (ใส่ทุก request)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-# Master Bearer key — สร้างด้วย:
-#   node -e "console.log('sk-gw-' + require('crypto').randomBytes(32).toString('hex'))"
-GATEWAY_API_KEY=sk-gw-...
-
-# Owner email(s) — metadata เฉยๆ (แสดงใน UI, ใช้ audit) ไม่ได้มีผลกับ auth
-# หลาย admin คั่นด้วย comma / semicolon / ช่องว่าง:
-AUTH_OWNER_EMAIL=jead@gmail.com,alice@gmail.com,bob@gmail.com`}</Code>
           <Info>
-            ถ้าไม่ใส่ทั้ง 2 ตัว → <strong>Local mode</strong> (ทุกอย่างเปิด ไม่ต้องใช้ key) —
-            เหมาะสำหรับ Docker Desktop ในเครื่องตัวเอง
+            <strong>Local mode</strong> (ไม่ตั้ง env ของวิธีใดเลย) → UI + API เปิดหมด ไม่มี auth — เหมาะสำหรับ Docker Desktop
           </Info>
 
-          <SubTitle>2 ชนิดของ Bearer key</SubTitle>
+          <SubTitle>3 สถานการณ์ใช้งานจริง</SubTitle>
+
+          <P><strong>A) เล่นบนเครื่องตัวเอง</strong> — <InlineCode>.env.local</InlineCode> ปล่อยว่าง</P>
+          <Code>{`# เครื่องส่วนตัว — ไม่มี auth ทุก endpoint เปิด
+# ว่างเปล่า = local mode`}</Code>
+
+          <P><strong>B) VPS + Password</strong> — ง่ายสุด ไม่ต้องพึ่ง Google</P>
+          <Code>{`# .env.production บน VPS
+GATEWAY_API_KEY=sk-gw-<generate>         # SDK / curl
+ADMIN_PASSWORD=<random-24-base64>        # admin UI login (7-day cookie)
+AUTH_OWNER_EMAIL=admin@example.com       # metadata (แสดง audit)
+
+# Generate:
+#   node -e "console.log('sk-gw-' + require('crypto').randomBytes(32).toString('hex'))"
+#   node -e "console.log(require('crypto').randomBytes(24).toString('base64').replace(/[+/=]/g,''))"`}</Code>
+
+          <P><strong>C) VPS + Domain + HTTPS + Google OAuth</strong> — production-grade</P>
+          <Code>{`# .env.production บน VPS
+GATEWAY_API_KEY=sk-gw-<generate>
+ADMIN_PASSWORD=<random-24-base64>        # fallback เผื่อ Google ล่ม
+
+AUTH_OWNER_EMAIL=alice@gmail.com,bob@gmail.com,cto@gmail.com
+GOOGLE_CLIENT_ID=<google-console>
+GOOGLE_CLIENT_SECRET=<google-console>
+NEXTAUTH_SECRET=<random-32-base64>
+NEXTAUTH_URL=https://your-domain.com
+
+# Google Console redirect URI:
+#   {NEXTAUTH_URL}/api/auth/callback/google`}</Code>
+
+          <SubTitle>Auth chain (first match wins)</SubTitle>
+          <Code>{`/admin/* + mutating /api/*  →  1. Bearer GATEWAY_API_KEY     →  pass
+                             →  2. Signed sml_admin cookie  →  pass  (password)
+                             →  3. Google session + owner   →  pass  (OAuth)
+                             →  else  →  /login (page) หรือ 401 (API)
+
+/v1/*   →  Bearer sk-gw-* (master) หรือ Bearer sml_live_* เท่านั้น`}</Code>
+
+          <SubTitle>2 ชนิด Bearer key สำหรับ `/v1/*`</SubTitle>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -622,17 +682,17 @@ AUTH_OWNER_EMAIL=jead@gmail.com,alice@gmail.com,bob@gmail.com`}</Code>
 
           <SubTitle>Admin ออก key ให้ client</SubTitle>
           <P>
-            เข้า <a href="/admin/keys" className="text-indigo-300 hover:underline">/admin/keys</a>{" "}
-            → ถ้าเป็นครั้งแรก ระบบจะ prompt ให้ใส่ <InlineCode>sk-gw-...</InlineCode> (master key)
-            → key เก็บใน sessionStorage ของ browser (ปิด tab = ต้องใส่ใหม่) → กรอก label → กด <strong>+ สร้าง key</strong>
-            → แสดง <InlineCode>sml_live_...</InlineCode> ครั้งเดียว (คัดลอกส่งให้ client)
+            Admin login (Google หรือ Password) → เข้า{" "}
+            <a href="/admin/keys" className="text-indigo-300 hover:underline">/admin/keys</a>{" "}
+            → กรอก label + expiry (optional) → กด <strong>+ สร้าง key</strong>
+            → แสดง <InlineCode>sml_live_...</InlineCode> ครั้งเดียว (copy ส่ง client)
           </P>
           <P>
-            Key เก็บใน DB เป็น SHA-256 hash — ดูย้อนหลังไม่ได้, revoke/pause ได้รายตัว, มี <InlineCode>last_used_at</InlineCode>
+            Key เก็บใน DB เป็น SHA-256 hash — ดูย้อนหลังไม่ได้, revoke/pause ได้รายตัว, มี <InlineCode>last_used_at</InlineCode> audit
           </P>
 
           <Info>
-            <strong>เพิ่ม admin email ใหม่</strong> — แก้ <InlineCode>AUTH_OWNER_EMAIL</InlineCode> ใน <InlineCode>.env</InlineCode> → restart container
+            <strong>เพิ่ม admin email ใหม่</strong> — แก้ <InlineCode>AUTH_OWNER_EMAIL</InlineCode> ใน <InlineCode>.env</InlineCode> → restart
             <br />
             <span className="text-xs">ssh droplet → <InlineCode>nano /opt/sml-gateway/.env.production</InlineCode> → <InlineCode>bash scripts/deploy-droplet.sh</InlineCode></span>
           </Info>

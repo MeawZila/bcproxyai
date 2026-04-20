@@ -5,20 +5,52 @@
 
 > ใช้ได้กับทุก client ที่รองรับ OpenAI SDK — Next.js, Python, LangChain, Hermes Agent, curl, OpenClaw, Aider, Cline ฯลฯ
 
-## Two Deployment Modes
+## 3 แบบการใช้งาน (เลือก 1)
 
-| | **Local** (default) | **Server** (public) |
-|---|---|---|
-| Auth | 🚫 off — open endpoint | ✅ Bearer API key only (no OAuth / login) |
-| Use case | Docker Desktop, single dev | Droplet / VPS, shared team / public |
-| Client sends | `api_key: "dummy"` | `api_key: "sk-gw-..."` หรือ `"sml_live_..."` |
-| Admin UI `/admin/keys` | เปิด | เปิด — ใส่ master key ใน prompt |
+ระบบ **auto-detect จาก `.env`** — ตั้ง env ของ method ไหน = method นั้นเปิดอัตโนมัติ
 
-**Mode switch อัตโนมัติ** จาก `.env.local`:
-- ถ้าไม่ตั้ง `GATEWAY_API_KEY` และ `AUTH_OWNER_EMAIL` → **local mode** (no auth)
-- ถ้าตั้งอย่างน้อย 1 ตัว → **server mode** (Bearer key enforced บน `/v1/*` + `/api/admin/*`)
+| | ① Local | ② VPS + Password | ③ VPS + Google OAuth |
+|---|---|---|---|
+| **ใคร** | Dev เล่นคนเดียว | ทีมเล็ก, ไม่มี Gmail / airgap | ทีม production, audit รายคน |
+| **Setup** | 5 นาที | 10 นาที | 30-45 นาที |
+| **Prereq** | Docker | VPS + Docker | VPS + Domain + HTTPS + Google Console |
+| **Auth** | 🚫 ไม่มี | Bearer + Password | Bearer + Password + Google |
+| **Client ใช้ยังไง** | `api_key: "dummy"` | `Bearer sk-gw-...` / `sml_live_*` | `Bearer sk-gw-...` / `sml_live_*` |
+| **Admin UI** | เปิดหมด | Password login 7-day cookie | Google login / Password fallback |
+| **Identity audit** | — | shared secret | ✅ per-email |
+| **Public-facing ปลอดภัย** | 🚫 ไม่ควร | ⚠️ พอได้ (ถ้ามี HTTPS) | ✅ production-grade |
 
-**Google OAuth เป็น optional identity layer** — ถ้าตั้ง `GOOGLE_CLIENT_ID/SECRET` + `NEXTAUTH_SECRET` + `NEXTAUTH_URL` จะเห็น session chip มุมขวาล่างของ dashboard บอกว่าใคร login เข้ามา (email + badge admin/guest ตาม `AUTH_OWNER_EMAIL`). **ไม่ได้ gate การใช้งาน** — Bearer key ยังเป็นตัวจริงที่ปกป้อง `/v1/*` และ `/api/admin/*`. ถ้าไม่ต้อง identity chip ให้ว่าง 4 ตัวนั้น → UI เปิดตามปกติไม่มี login chip
+### ① Local — "เล่นได้เลย"
+```bash
+git clone https://github.com/jaturapornchai/bcproxyai.git sml-gateway
+cd sml-gateway
+cp .env.example .env.local        # ไม่ต้องแก้อะไร (auth vars ว่างทั้งหมด)
+docker compose up -d --build
+# เปิด http://localhost:3334/
+```
+
+### ② VPS + Password — ง่าย ไม่ต้องพึ่ง Google
+ตั้ง 3 ตัวใน `.env.production`:
+```bash
+GATEWAY_API_KEY=sk-gw-<generate>      # SDK / curl
+ADMIN_PASSWORD=<random-24-base64>     # admin UI login
+AUTH_OWNER_EMAIL=admin@example.com    # metadata (audit label)
+```
+
+### ③ VPS + Google OAuth — ของจริง production
+ตั้งครบ 8 ตัวใน `.env.production`:
+```bash
+GATEWAY_API_KEY=sk-gw-<generate>
+ADMIN_PASSWORD=<random-24-base64>     # fallback เผื่อ Google ล่ม
+AUTH_OWNER_EMAIL=alice@gmail.com,bob@gmail.com,cto@gmail.com
+GOOGLE_CLIENT_ID=<from-google-console>
+GOOGLE_CLIENT_SECRET=<from-google-console>
+NEXTAUTH_SECRET=<random-32-base64>
+NEXTAUTH_URL=https://your-domain.com
+# redirect URI ที่ Google Console: {NEXTAUTH_URL}/api/auth/callback/google
+```
+
+**Rule:** เปิด method ไหน = ตั้ง env ของ method นั้น · ไม่ตั้ง = ปิด · ไม่มี `AUTH_MODE` flag
 
 ดูรายละเอียดทุกตัวแปรใน [.env.example](.env.example).
 
@@ -34,7 +66,7 @@
 |---|---|
 | 🆓 Free-only | 30+ providers (free tier เท่านั้น — paid ถูกกรองออก), 200+ models |
 | 🇹🇭 Thai-native | Typhoon (SCB 10X) เป็น provider ตัวแรก + virtual model `sml/thai` |
-| 🔐 Bearer-only auth | local = no auth; server = Bearer key (ไม่มี OAuth). Admin ออก key รายตัวที่ `/admin/keys` |
+| 🔐 3 auth methods | Local (open) / Password cookie / Google OAuth — เลือกได้ตาม env, ใช้คู่ได้. Per-client key ออกที่ `/admin/keys` |
 | 🔎 Auto-verify | probe homepage + `/v1/models` ของทุก provider ทุก 3 นาที + sync URL ใหม่จาก cheahjs/LiteLLM registry ทุก 6 ชม. |
 | 🌐 Auto-Discovery | สแกน OpenRouter/HuggingFace/URL pattern หา provider ใหม่ทุก 15 นาที (กรอง paid ทิ้ง) |
 | ⚡ Fast | hedge top-3, warmup, semantic cache → p50 ~500ms |
@@ -90,28 +122,45 @@ curl -X POST http://localhost:3334/v1/chat/completions \
   -d '{"model":"sml/auto","messages":[{"role":"user","content":"สวัสดี"}]}'
 ```
 
-### เปิดโหมด Server (public deploy)
-ใน `.env.local` ตั้งแค่ **2 ตัว**:
+### เปิดโหมด VPS + Password (ง่ายสุด — ไม่พึ่ง Google)
+ใน `.env.production` ของ droplet ตั้ง **3 ตัว**:
 ```bash
-# Master Bearer key — สร้างด้วย:
+# Generate:
 #   node -e "console.log('sk-gw-' + require('crypto').randomBytes(32).toString('hex'))"
 GATEWAY_API_KEY=sk-gw-<32-byte-hex>
 
-# Owner email (metadata — แสดงใน UI, ใช้ audit, ไม่มีผลกับ auth)
-# ใส่หลาย admin คั่น comma ได้:
+# Generate:
+#   node -e "console.log(require('crypto').randomBytes(24).toString('base64').replace(/[+/=]/g,''))"
+ADMIN_PASSWORD=<32-char-random>
+
+# Metadata (แสดงใน audit + UI)
 AUTH_OWNER_EMAIL=you@gmail.com,teammate@gmail.com
 ```
-Restart → `/v1/*` + `/api/admin/*` จะต้องใช้ Bearer key:
-- `sk-gw-...` (master) — เต็มสิทธิ์ (รวม `/api/admin/*`)
-- `sml_live_...` (admin-issued) — เฉพาะ `/v1/*` (ออกได้ที่ `/admin/keys`)
 
-หน้า UI (dashboard / setup / guide) **เปิดให้เข้าเอง ไม่ต้อง login** — `/admin/keys` จะถาม master key ตอนเปิด (เก็บใน sessionStorage ของ browser)
+### เปิดโหมด VPS + Google OAuth (audit per-email)
+เพิ่มอีก **4 ตัว**:
+```bash
+NEXTAUTH_URL=https://your-domain.com
+NEXTAUTH_SECRET=<random-32-base64>
+GOOGLE_CLIENT_ID=<from-google-console>
+GOOGLE_CLIENT_SECRET=<from-google-console>
+# redirect URI ที่ Google: {NEXTAUTH_URL}/api/auth/callback/google
+```
+Google OAuth + Password **ใช้คู่กันได้** — login ด้วยวิธีไหนก็ได้
 
 **เพิ่ม/ลบ admin ภายหลัง:** แก้ `AUTH_OWNER_EMAIL` → restart
 ```bash
 ssh root@your-droplet
 nano /opt/sml-gateway/.env.production
 bash /opt/sml-gateway/scripts/deploy-droplet.sh
+```
+
+### Auth chain สำหรับ `/admin/*` + mutating `/api/*`
+```
+1. Bearer GATEWAY_API_KEY  → pass  (CI / SDK path)
+2. Signed admin cookie     → pass  (password login)
+3. Google session + owner  → pass  (OAuth path)
+4. else → /login (page) หรือ 401 (API)
 ```
 
 ### คู่มือการสมัครใช้ API key (สำหรับ user ทั่วไป)
