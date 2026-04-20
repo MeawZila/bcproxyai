@@ -4,7 +4,7 @@ services:
     image: sml-gateway
     build: .
     expose:
-      - "3335"
+      - "3000"
     env_file:
       - .env.local
     environment:
@@ -33,7 +33,7 @@ services:
   caddy:
     image: caddy:2-alpine
     ports:
-      - "3334:80"
+      - "3339:80"
     volumes:
       - ./caddy-docker.Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
