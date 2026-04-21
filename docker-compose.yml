@@ -5,14 +5,15 @@ services:
     build: .
     expose:
       - "3000"
-    env_file:
-      - .env
     environment:
       DATABASE_URL: postgres://sml:sml@postgres:5432/smlgateway
       REDIS_URL: redis://redis:6379
       # Ollama runs on the Docker host, not inside the sml-gateway container.
       # host.docker.internal resolves to the host on Docker Desktop / Linux 20.10+.
       OLLAMA_BASE_URL: http://host.docker.internal:11434
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+      AUTH_OWNER_EMAIL: ${AUTH_OWNER_EMAIL:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
