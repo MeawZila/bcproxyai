@@ -21,8 +21,8 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - sml-gateway-data:/app/data
-      - ./exam-images:/app/exam-images:ro
+      - /mnt/Harddisk_Old_1T/sml-gateway/data:/app/data
+      - /mnt/Harddisk_Old_1T/sml-gateway//exam-images:/app/exam-images:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 10s
@@ -35,7 +35,7 @@ services:
     ports:
       - "3334:80"
     volumes:
-      - ./caddy-docker.Caddyfile:/etc/caddy/Caddyfile:ro
+      - /mnt/Harddisk_Old_1T/sml-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       sml-gateway:
         condition: service_healthy
@@ -64,7 +64,7 @@ services:
       - "-c"
       - "shared_preload_libraries=pg_stat_statements"
     volumes:
-      - sml-gateway-pg:/var/lib/postgresql/data
+      - /mnt/Harddisk_Old_1T/sml-gateway/pg:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sml -d smlgateway"]
       interval: 5s
@@ -92,7 +92,7 @@ services:
       - --tcp-keepalive
       - "60"
     volumes:
-      - sml-gateway-redis:/data
+      - /mnt/Harddisk_Old_1T/sml-gateway/redis:/data
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
