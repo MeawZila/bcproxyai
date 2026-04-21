@@ -6,7 +6,7 @@ services:
     expose:
       - "3000"
     env_file:
-      - .env.local
+      - .env
     environment:
       DATABASE_URL: postgres://sml:sml@postgres:5432/smlgateway
       REDIS_URL: redis://redis:6379
